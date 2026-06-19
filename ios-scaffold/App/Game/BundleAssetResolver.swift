@@ -3,6 +3,28 @@ import UIKit
 
 @MainActor
 enum BundleAssetResolver {
+    static func url(candidates: [String]) -> URL? {
+        for candidate in expandedCandidates(candidates) {
+            let normalizedPath = candidate.replacingOccurrences(of: "\\", with: "/")
+            let nsPath = normalizedPath as NSString
+            let fileName = nsPath.lastPathComponent as NSString
+            let directory = nsPath.deletingLastPathComponent
+            let resourceName = fileName.deletingPathExtension
+            let resourceExtension = fileName.pathExtension.isEmpty ? nil : fileName.pathExtension
+            let bundleDirectory = directory.isEmpty || directory == "." ? nil : directory
+
+            if let path = Bundle.main.path(
+                forResource: resourceName,
+                ofType: resourceExtension,
+                inDirectory: bundleDirectory
+            ) {
+                return URL(fileURLWithPath: path)
+            }
+        }
+
+        return nil
+    }
+
     static func texture(candidates: [String]) -> SKTexture? {
         guard let image = image(candidates: candidates) else {
             return nil

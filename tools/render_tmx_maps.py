@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render orthogonal TMX tile maps into PNG files.
+"""Render TMX tile maps into PNG files.
 
 The original APK stores phase maps as small tileset images plus TMX metadata.
 SpriteKit does not load TMX directly, so this script generates stable composite
@@ -37,32 +37,66 @@ def decode_layer_data(data_element: ET.Element, expected_count: int) -> list[int
     return [value & GID_MASK for value in values]
 
 
+class Tileset:
+    def __init__(self, element: ET.Element, tmx_path: Path) -> None:
+        self.first_gid = int(element.attrib.get("firstgid", "1"))
+        self.tile_width = int(element.attrib["tilewidth"])
+        self.tile_height = int(element.attrib["tileheight"])
+
+        source_image = element.find("image")
+        if source_image is None:
+            raise ValueError(f"Missing tileset image: {tmx_path}")
+
+        source_path = tmx_path.parent / source_image.attrib["source"]
+        self.image = Image.open(source_path).convert("RGBA")
+        self.columns = max(1, self.image.width // self.tile_width)
+        self.tile_count = max(1, self.columns * max(1, self.image.height // self.tile_height))
+
+    @property
+    def last_gid(self) -> int:
+        return self.first_gid + self.tile_count - 1
+
+    def tile(self, gid: int) -> Image.Image:
+        tile_index = gid - self.first_gid
+        source_x = (tile_index % self.columns) * self.tile_width
+        source_y = (tile_index // self.columns) * self.tile_height
+        tile_box = (source_x, source_y, source_x + self.tile_width, source_y + self.tile_height)
+        return self.image.crop(tile_box)
+
+
+def find_tileset(tilesets: list[Tileset], gid: int) -> Tileset | None:
+    for tileset in reversed(tilesets):
+        if gid >= tileset.first_gid:
+            return tileset
+    return None
+
+
 def render_tmx(tmx_path: Path, output_path: Path) -> None:
     tree = ET.parse(tmx_path)
     root = tree.getroot()
 
-    if root.attrib.get("orientation") != "orthogonal":
-        raise ValueError(f"Only orthogonal maps are supported: {tmx_path}")
-
+    orientation = root.attrib.get("orientation")
     map_width = int(root.attrib["width"])
     map_height = int(root.attrib["height"])
     tile_width = int(root.attrib["tilewidth"])
     tile_height = int(root.attrib["tileheight"])
 
-    tileset = root.find("tileset")
-    if tileset is None:
+    tileset_elements = root.findall("tileset")
+    if not tileset_elements:
         raise ValueError(f"Missing tileset: {tmx_path}")
 
-    first_gid = int(tileset.attrib.get("firstgid", "1"))
-    source_image = tileset.find("image")
-    if source_image is None:
-        raise ValueError(f"Missing tileset image: {tmx_path}")
+    tilesets = [Tileset(element, tmx_path) for element in tileset_elements]
 
-    source_path = tmx_path.parent / source_image.attrib["source"]
-    tileset_image = Image.open(source_path).convert("RGBA")
-    columns = max(1, tileset_image.width // tile_width)
-
-    output = Image.new("RGBA", (map_width * tile_width, map_height * tile_height), (0, 0, 0, 0))
+    if orientation == "orthogonal":
+        output = Image.new("RGBA", (map_width * tile_width, map_height * tile_height), (0, 0, 0, 0))
+    elif orientation == "isometric":
+        output = Image.new(
+            "RGBA",
+            ((map_width + map_height) * tile_width // 2, (map_width + map_height) * tile_height // 2 + tile_height * 2),
+            (0, 0, 0, 0),
+        )
+    else:
+        raise ValueError(f"Unsupported TMX map orientation: {orientation}")
 
     for layer in root.findall("layer"):
         data_element = layer.find("data")
@@ -74,17 +108,21 @@ def render_tmx(tmx_path: Path, output_path: Path) -> None:
             if gid == 0:
                 continue
 
-            tile_index = gid - first_gid
-            if tile_index < 0:
+            tileset = find_tileset(tilesets, gid)
+            if tileset is None:
                 continue
 
-            source_x = (tile_index % columns) * tile_width
-            source_y = (tile_index // columns) * tile_height
-            tile_box = (source_x, source_y, source_x + tile_width, source_y + tile_height)
-            tile = tileset_image.crop(tile_box)
+            tile = tileset.tile(gid)
+            tile_x = index % map_width
+            tile_y = index // map_width
 
-            destination_x = (index % map_width) * tile_width
-            destination_y = (index // map_width) * tile_height
+            if orientation == "orthogonal":
+                destination_x = tile_x * tile_width
+                destination_y = tile_y * tile_height
+            else:
+                destination_x = (tile_x - tile_y) * (tile_width // 2) + (map_height - 1) * (tile_width // 2)
+                destination_y = (tile_x + tile_y) * (tile_height // 2)
+
             output.alpha_composite(tile, (destination_x, destination_y))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -94,13 +132,13 @@ def render_tmx(tmx_path: Path, output_path: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--maps-dir", required=True, type=Path, help="Directory containing DT_Phase*_ortho.tmx")
+    parser.add_argument("--maps-dir", required=True, type=Path, help="Directory containing DT_Phase*.tmx")
     parser.add_argument("--output-dir", required=True, type=Path, help="Directory for rendered PNG maps")
     args = parser.parse_args()
 
-    tmx_files = sorted(args.maps_dir.glob("DT_Phase*_ortho.tmx"))
+    tmx_files = sorted(args.maps_dir.glob("DT_Phase*.tmx"))
     if not tmx_files:
-        print(f"No orthogonal TMX maps found under {args.maps_dir}")
+        print(f"No TMX maps found under {args.maps_dir}")
         return 1
 
     for tmx_path in tmx_files:

@@ -10,6 +10,7 @@ This project preserves gameplay behavior and upgrades only visual/audio packagin
 - Update sprite metadata only when coordinate scaling is required by an asset resolution change.
 - Improve app icons, splash images, menus, and interface textures without changing gameplay timing or balance.
 - Generate full map PNGs from original TMX metadata when SpriteKit needs a renderable map asset.
+- Rebuild mechanics only when names/assets/strings are evidenced by the APK, and keep uncertain values isolated.
 
 ## Not Allowed Without Original Source Verification
 
@@ -18,6 +19,7 @@ This project preserves gameplay behavior and upgrades only visual/audio packagin
 - Replacing original gameplay logic inferred from Android bytecode with new behavior.
 - Removing fallback access to the original extracted assets.
 - Adding fake objectives, economy counters, shops, or character movement that is not verified from the original source.
+- Claiming exact gameplay parity while the original C++ source remains unavailable.
 
 ## Runtime Asset Resolution
 

@@ -6,19 +6,24 @@
 - وجود 117 ملفاً داخل `LegacyAssets` بعد إضافة ملفات metadata المكبرة.
 - توليد 14 ملف `.plist` مكبر داخل `ios-scaffold/Resources/LegacyAssets/iphone-hd-upscaled` بنسبة 1.875.
 - توليد خرائط كاملة من ملفات TMX داخل `ios-scaffold/Resources/GeneratedMaps`.
-- استبدال واجهة SwiftUI التجريبية بمشهد SpriteKit محافظ يعرض خريطة اللعبة ويدعم تحريك الكاميرا والزووم داخل حدود الخريطة.
+- استبدال واجهة SwiftUI التجريبية بمشهد SpriteKit تفاعلي يعرض خريطة isometric أصلية ويدعم تحريك الكاميرا والزووم داخل حدود الخريطة.
+- إضافة loop لعب أولي مبني من إشارات APK: اختيار فئة بناء من السوق، وضع البناء على الخريطة، مؤقت إنشاء، إنتاج موارد، وتحصيل الموارد عند لمس البناء.
+- إضافة حركة شخصية/جمل من frames الأصلية داخل `TravelingCamel-hd.plist`.
+- إضافة موسيقى خلفية عند توفر `music_sound/BackgroundSound.mp3`.
 - تحميل الأصول مع تفضيل النسخ المحسنة من `iphone-hd-upscaled` ثم الرجوع تلقائياً إلى أصول `iphone-hd` الأصلية.
 - تحديث GitHub Actions workflow لبناء IPA غير موقع ونسخ أصول اللعبة داخل حزمة التطبيق.
 - إضافة أدوات:
   - `tools/sync_apk_assets.ps1`
   - `tools/scale_cocos_plists.py`
   - `tools/render_tmx_maps.py`
+  - `tools/report_sprite_frames.py`
+  - `tools/extract_apk_gameplay_strings.py`
   - `tools/package_small_for_github.ps1`
   - `tools/package_metadata_for_github.ps1`
 
 ## حدود مهمة
 
-لا يمكن تحويل `libgame.so` أو `classes.dex` من APK إلى iOS مباشرة. إذا كان المطلوب هو نفس الـ Gameplay بنسبة 100%، فيجب توفير سورس اللعبة الأصلي Cocos2d-x/C++ أو إعادة بناء المنطق من الصفر ومقارنته بالنسخة الأصلية. لذلك لا يتم حالياً اختراع اقتصاد أو مهام أو شخصيات متحركة غير مثبتة من السورس الأصلي.
+لا يمكن تحويل `libgame.so` أو `classes.dex` من APK إلى iOS مباشرة. تم استخراج أسماء gameplay من `classes.dex` و`libgame.so` وظهر منها: `Business`, `Residential`, `Farm`, `Energy`, `Oil`, `Goals`, `Souk`, `Workers`, `Goods`, `Coins`, `Dinars`. النسخة الحالية تعيد بناء هذه الحلقة من الصفر في Swift/SpriteKit، لكنها ليست مطابقة 100% حتى يتم تفكيك منطق C++ الأصلي أو توفير السورس.
 
 ## طريقة الرفع الأسرع إلى GitHub
 
