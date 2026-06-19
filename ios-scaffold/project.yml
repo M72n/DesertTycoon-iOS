@@ -22,20 +22,18 @@ targets:
     sources:
       - path: App
     resources:
-      - path: Resources
-        optional: true
-      - path: Resources/LegacyAssets/Icon.png
-      - path: Resources/LegacyAssets/vunglepub_sdk_close.png
-      - path: Resources/LegacyAssets/vunglepub_sdk_mute.png
-      - path: Resources/LegacyAssets/vunglepub_sdk_unmute.png
-      - path: Resources/LegacyAssets/fonts
+      - path: Resources/LegacyAssets
+        type: folder
         buildPhase: resources
-      - path: Resources/LegacyAssets/iphone-hd
-        buildPhase: resources
-      - path: Resources/LegacyAssets/movies
-        buildPhase: resources
-      - path: Resources/LegacyAssets/music_sound
-        buildPhase: resources
+      - path: Resources/preview_camel.png
+      - path: Resources/preview_counter.png
+      - path: Resources/preview_phase1_map.png
+      - path: Resources/preview_phase2_map.png
+      - path: Resources/preview_phase3_map.png
+      - path: Resources/preview_souk_bg.jpg
+      - path: Resources/preview_splash_arabic.jpg
+      - path: Resources/preview_splash_english.jpg
+      - path: App/Assets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ba.lum.deserttycoon
