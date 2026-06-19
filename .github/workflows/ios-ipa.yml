@@ -16,7 +16,6 @@ jobs:
   build:
     name: Archive and export IPA
     runs-on: macos-latest
-
     env:
       BUNDLE_ID: ba.lum.deserttycoon
       CODE_SIGN_IDENTITY: ${{ secrets.CODE_SIGN_IDENTITY }}
@@ -59,7 +58,6 @@ jobs:
             echo "::error::Missing DEVELOPMENT_TEAM or KEYCHAIN_PASSWORD secrets."
             exit 1
           fi
-
           certificate_path="$RUNNER_TEMP/build_certificate.p12"
           profile_path="$RUNNER_TEMP/build_profile.mobileprovision"
           profile_plist="$RUNNER_TEMP/build_profile.plist"
@@ -88,7 +86,7 @@ jobs:
         run: |
           set -euo pipefail
           profile_name="${{ steps.signing.outputs.profile_name }}"
-          cat > ios-scaffold/ExportOptions.ci.plist <<PLIST
+          cat > ios-scaffold/ExportOptions.ci.plist << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -96,21 +94,26 @@ jobs:
             <key>destination</key>
             <string>export</string>
             <key>method</key>
-            <string>${{ inputs.export_method }}</string>
+            <string>EXPORT_METHOD_PLACEHOLDER</string>
             <key>signingStyle</key>
             <string>manual</string>
             <key>teamID</key>
-            <string>${DEVELOPMENT_TEAM}</string>
+            <string>TEAM_ID_PLACEHOLDER</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>${BUNDLE_ID}</key>
-              <string>${profile_name}</string>
+              <key>BUNDLE_ID_PLACEHOLDER</key>
+              <string>PROFILE_NAME_PLACEHOLDER</string>
             </dict>
             <key>stripSwiftSymbols</key>
             <true/>
           </dict>
           </plist>
-          PLIST
+          EOF
+          # Replace placeholders with actual values
+          sed -i "s|EXPORT_METHOD_PLACEHOLDER|${{ inputs.export_method }}|g" ios-scaffold/ExportOptions.ci.plist
+          sed -i "s|TEAM_ID_PLACEHOLDER|${DEVELOPMENT_TEAM}|g" ios-scaffold/ExportOptions.ci.plist
+          sed -i "s|BUNDLE_ID_PLACEHOLDER|${BUNDLE_ID}|g" ios-scaffold/ExportOptions.ci.plist
+          sed -i "s|PROFILE_NAME_PLACEHOLDER|${profile_name}|g" ios-scaffold/ExportOptions.ci.plist
 
       - name: Build IPA
         shell: bash
@@ -121,7 +124,8 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x ios-scaffold/build_ipa.sh
-          ./ios-scaffold/build_ipa.sh
+          cd ios-scaffold
+          ./build_ipa.sh
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
