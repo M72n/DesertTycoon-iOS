@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="25" height="13" tilewidth="128" tileheight="128">
+ <tileset firstgid="1" name="DT BG_Ortho Tile_May 21 2012" tilewidth="128" tileheight="128">
+  <image source="DT_Phase2_ortho.png" width="128" height="640"/>
+ </tileset>
+ <layer name="Tile Layer 1" width="25" height="13">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA2NhYGBgGcWjeAhiJiBmpLEdrFDMTAc7WGnoJ1YsmNp+wmYHtf2Eyw5q+gkAex9loxQFAAA=
+  </data>
+ </layer>
+</map>
