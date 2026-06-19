@@ -35,7 +35,7 @@ jobs:
 
           xcodebuild \
             -project DesertTycoon.xcodeproj \
-            -target DesertTycoon \
+            -scheme DesertTycoon \
             -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
