@@ -1,77 +1,135 @@
-# أسرع طريقة لتثبيت اللعبة على iPhone من Windows
+# بناء IPA بدون امتلاك Mac
 
-هذه الطريقة لا تحتاج Mac ولا شهادات Apple Developer في البداية. الفكرة:
+لا تشارك كلمة مرور Apple ID مع أي شخص. استخدم GitHub Secrets أو خدمة CI مشابهة لحفظ الشهادات والمفاتيح.
+
+## الخيار المجهز في هذا المشروع
+
+أضفت workflow في:
 
 ```text
-GitHub Actions يبني IPA غير موقّع
-Sideloadly على Windows يوقّع IPA بحساب Apple ID ويثبته على iPhone
+.github/workflows/ios-ipa.yml
 ```
 
-## 1. جهّز ملف الرفع
+بعد رفع المشروع إلى GitHub، افتح:
 
-افتح PowerShell داخل مجلد المشروع وشغّل:
+```text
+Settings -> Secrets and variables -> Actions -> New repository secret
+```
+
+وأضف الأسرار التالية:
+
+```text
+DEVELOPMENT_TEAM
+KEYCHAIN_PASSWORD
+BUILD_CERTIFICATE_BASE64
+P12_PASSWORD
+BUILD_PROVISION_PROFILE_BASE64
+```
+
+اختياري عند وجود أكثر من شهادة توقيع في الحساب:
+
+```text
+CODE_SIGN_IDENTITY
+```
+
+ثم شغّل:
+
+```text
+Actions -> Build iOS IPA -> Run workflow
+```
+
+اختر `debugging` للتثبيت على جهازك المسجل في حساب Apple Developer، أو `app-store-connect` لتجهيز ملف مناسب لمسار TestFlight/App Store.
+
+## إنشاء شهادة من Windows
+
+ثبّت OpenSSL، ثم نفذ:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\package_for_github.ps1
+openssl genrsa -out ios_signing.key 2048
+openssl req -new -key ios_signing.key -out ios_signing.csr
 ```
 
-سيظهر ملف:
+افتح Apple Developer:
 
 ```text
-DesertTycoon-iOS-GitHub-Upload.zip
+Certificates, IDs & Profiles -> Certificates -> Add
 ```
 
-## 2. ارفع المشروع إلى GitHub
+اختر نوع الشهادة المناسب:
 
-1. افتح [github.com/new](https://github.com/new).
-2. أنشئ Repository جديد باسم `DesertTycoon-iOS`.
-3. فك ضغط ملف `DesertTycoon-iOS-GitHub-Upload.zip`.
-4. من صفحة Repository اختر `Add file -> Upload files`.
-5. اسحب كل الملفات والمجلدات التي خرجت من ZIP، ثم اضغط `Commit changes`.
+- Apple Development: للتثبيت التجريبي على أجهزة مسجلة.
+- Apple Distribution: لـ TestFlight أو App Store.
 
-تأكد أن المجلد التالي موجود داخل GitHub:
+ارفع ملف `ios_signing.csr`، ثم حمّل ملف الشهادة `.cer`.
+
+حوّل الشهادة إلى `.p12`:
+
+```powershell
+openssl x509 -in ios_distribution.cer -inform DER -out ios_distribution.pem -outform PEM
+openssl pkcs12 -export -inkey ios_signing.key -in ios_distribution.pem -out ios_distribution.p12 -name "iOS Signing"
+```
+
+كلمة المرور التي تختارها في أمر `pkcs12` ضعها في secret باسم:
 
 ```text
-.github/workflows/ios-unsigned-ipa.yml
+P12_PASSWORD
 ```
 
-## 3. ابنِ IPA
+## إنشاء Provisioning Profile
 
-من GitHub:
+من Apple Developer:
 
 ```text
-Actions -> Build Unsigned IPA for Sideloadly -> Run workflow
+Certificates, IDs & Profiles -> Identifiers
 ```
 
-بعد انتهاء البناء:
+أنشئ App ID بنفس Bundle ID:
 
 ```text
-Artifacts -> DesertTycoon-unsigned-IPA
+ba.lum.deserttycoon
 ```
 
-حمّل ملف `DesertTycoon-unsigned.ipa`.
-
-## 4. ثبّت IPA على iPhone من Windows
-
-1. حمّل Sideloadly من [sideloadly.io](https://sideloadly.io/index.html).
-2. ثبّت iTunes من Apple إذا طلبه Sideloadly.
-3. وصّل iPhone بالكمبيوتر عبر USB واضغط Trust على الهاتف.
-4. افتح Sideloadly.
-5. اسحب ملف `DesertTycoon-unsigned.ipa`.
-6. أدخل Apple ID الخاص بك.
-7. اضغط Start.
-
-إذا ظهر التطبيق على iPhone لكن لم يفتح:
+ثم:
 
 ```text
-Settings -> General -> VPN & Device Management
+Profiles -> Add
 ```
 
-ثم اعمل Trust لحساب Apple ID.
+اختر:
+
+- iOS App Development إذا كان export method هو `debugging`.
+- App Store إذا كان export method هو `app-store-connect`.
+
+اربطه بالشهادة السابقة، ثم حمّل ملف `.mobileprovision`.
+
+## تحويل الملفات إلى Base64 على Windows
+
+لملف الشهادة:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("ios_distribution.p12")) | Set-Clipboard
+```
+
+الصق الناتج في GitHub secret:
+
+```text
+BUILD_CERTIFICATE_BASE64
+```
+
+لملف provisioning profile:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("profile.mobileprovision")) | Set-Clipboard
+```
+
+الصق الناتج في GitHub secret:
+
+```text
+BUILD_PROVISION_PROFILE_BASE64
+```
 
 ## ملاحظات مهمة
 
-- بحساب Apple ID مجاني، التطبيق غالباً يعمل لمدة 7 أيام ثم يحتاج إعادة توقيع عبر Sideloadly.
-- بحساب Apple Developer مدفوع، المدة أطول.
-- هذه الطريقة مناسبة للتجربة على جهازك، وليست للنشر في App Store.
-- اللعبة الحالية ما زالت نسخة iOS أولية وليست تحويل كامل لمنطق APK الأصلي.
+- ملف IPA للتثبيت المباشر على iPhone يحتاج جهازك مسجلاً داخل Apple Developer إذا كان Development أو Ad Hoc.
+- TestFlight يتطلب App Store Connect وتوقيع Distribution.
+- هذا المشروع الحالي scaffold قابل للبناء، لكنه ليس نسخة كاملة من منطق لعبة Android الأصلية لأن كود APK لا يعمل على iOS مباشرة.

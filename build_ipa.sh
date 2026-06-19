@@ -1,0 +1,131 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      export_method:
+        description: "Xcode export method: debugging, release-testing, or app-store-connect"
+        required: true
+        default: "debugging"
+      require_xcode_26:
+        description: "Fail if runner is older than Xcode 26"
+        required: true
+        default: "true"
+
+jobs:
+  build:
+    name: Archive and export IPA
+    runs-on: macos-latest
+
+    env:
+      BUNDLE_ID: ba.lum.deserttycoon
+      CODE_SIGN_IDENTITY: ${{ secrets.CODE_SIGN_IDENTITY }}
+      DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcode_major="$(xcodebuild -version | awk '/Xcode/ { split($2, v, "."); print v[1] }')"
+          if [[ "${{ inputs.require_xcode_26 }}" == "true" && "${xcode_major:-0}" -lt 26 ]]; then
+            echo "::error::This runner has Xcode ${xcode_major}. App Store Connect uploads require Xcode 26 or later."
+            exit 1
+          fi
+
+      - name: Install XcodeGen
+        shell: bash
+        run: brew install xcodegen
+
+      - name: Import signing certificate and profile
+        id: signing
+        shell: bash
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${BUILD_CERTIFICATE_BASE64:-}" || -z "${BUILD_PROVISION_PROFILE_BASE64:-}" ]]; then
+            echo "::error::Missing BUILD_CERTIFICATE_BASE64 or BUILD_PROVISION_PROFILE_BASE64 secrets."
+            exit 1
+          fi
+          if [[ -z "${DEVELOPMENT_TEAM:-}" || -z "${KEYCHAIN_PASSWORD:-}" ]]; then
+            echo "::error::Missing DEVELOPMENT_TEAM or KEYCHAIN_PASSWORD secrets."
+            exit 1
+          fi
+
+          certificate_path="$RUNNER_TEMP/build_certificate.p12"
+          profile_path="$RUNNER_TEMP/build_profile.mobileprovision"
+          profile_plist="$RUNNER_TEMP/build_profile.plist"
+          keychain_path="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
+          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$profile_path"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" -P "${P12_PASSWORD:-}" -A -t cert -f pkcs12 -k "$keychain_path"
+          security list-keychain -d user -s "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          security cms -D -i "$profile_path" > "$profile_plist"
+          profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print UUID' "$profile_plist")"
+          profile_name="$(/usr/libexec/PlistBuddy -c 'Print Name' "$profile_plist")"
+          cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
+
+          echo "profile_name=$profile_name" >> "$GITHUB_OUTPUT"
+
+      - name: Create CI export options
+        shell: bash
+        run: |
+          set -euo pipefail
+          profile_name="${{ steps.signing.outputs.profile_name }}"
+          cat > ios-scaffold/ExportOptions.ci.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>destination</key>
+            <string>export</string>
+            <key>method</key>
+            <string>${{ inputs.export_method }}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>${DEVELOPMENT_TEAM}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${profile_name}</string>
+            </dict>
+            <key>stripSwiftSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+
+      - name: Build IPA
+        shell: bash
+        env:
+          CODE_SIGN_STYLE: Manual
+          EXPORT_OPTIONS_PLIST: ExportOptions.ci.plist
+          PROVISIONING_PROFILE_SPECIFIER: ${{ steps.signing.outputs.profile_name }}
+        run: |
+          set -euo pipefail
+          chmod +x ios-scaffold/build_ipa.sh
+          ./ios-scaffold/build_ipa.sh
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DesertTycoon-IPA
+          path: ios-scaffold/build/export/*.ipa
+          if-no-files-found: error

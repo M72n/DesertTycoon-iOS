@@ -1,0 +1,103 @@
+name: Build Unsigned IPA for Sideloadly
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build unsigned device IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        shell: bash
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        shell: bash
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        shell: bash
+        working-directory: ios-scaffold
+        run: xcodegen generate
+
+      - name: Build app without signing
+        shell: bash
+        working-directory: ios-scaffold
+        run: |
+          set -eo pipefail
+          mkdir -p build/logs
+          xcodebuild -list -project DesertTycoon.xcodeproj | tee build/logs/xcodebuild-list.log
+
+          xcodebuild \
+            -project DesertTycoon.xcodeproj \
+            -scheme DesertTycoon \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build 2>&1 | tee build/logs/xcodebuild.log
+
+      - name: Copy game assets into app bundle
+        shell: bash
+        working-directory: ios-scaffold
+        run: |
+          set -euo pipefail
+          app_path="build/DerivedData/Build/Products/Release-iphoneos/DesertTycoon.app"
+          if [[ ! -d "$app_path" ]]; then
+            echo "::error::App bundle not found at $app_path"
+            find build/DerivedData/Build/Products -maxdepth 3 -type d -name "*.app" -print || true
+            exit 1
+          fi
+
+          if [[ -d Resources/LegacyAssets ]]; then
+            cp -R Resources/LegacyAssets/. "$app_path/"
+          fi
+
+          cp Resources/preview_*.png "$app_path/" 2>/dev/null || true
+          cp Resources/preview_*.jpg "$app_path/" 2>/dev/null || true
+
+          echo "Assets copied into app bundle:"
+          find "$app_path" -maxdepth 2 -type d | sort
+          du -sh "$app_path"
+
+      - name: Package unsigned IPA
+        shell: bash
+        working-directory: ios-scaffold
+        run: |
+          set -euo pipefail
+          app_path="build/DerivedData/Build/Products/Release-iphoneos/DesertTycoon.app"
+          if [[ ! -d "$app_path" ]]; then
+            echo "::error::App bundle not found at $app_path"
+            find build/DerivedData/Build/Products -maxdepth 3 -type d -name "*.app" -print || true
+            exit 1
+          fi
+
+          rm -rf build/unsigned-ipa
+          mkdir -p build/unsigned-ipa/Payload
+          cp -R "$app_path" build/unsigned-ipa/Payload/
+          ditto -c -k --keepParent build/unsigned-ipa/Payload build/DesertTycoon-unsigned.ipa
+          ls -lh build/DesertTycoon-unsigned.ipa
+
+      - name: Upload unsigned IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DesertTycoon-unsigned-IPA
+          path: ios-scaffold/build/DesertTycoon-unsigned.ipa
+          if-no-files-found: error
+
+      - name: Upload Xcode build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xcode-build-logs
+          path: ios-scaffold/build/logs
+          if-no-files-found: ignore
