@@ -1,68 +1,135 @@
-param(
-    [string]$OutputPath = "$PSScriptRoot\..\DesertTycoon-iOS-GitHub-Upload-SMALL.zip"
-)
+# بناء IPA بدون امتلاك Mac
 
-$ErrorActionPreference = "Stop"
+لا تشارك كلمة مرور Apple ID مع أي شخص. استخدم GitHub Secrets أو خدمة CI مشابهة لحفظ الشهادات والمفاتيح.
 
-$projectRoot = Resolve-Path "$PSScriptRoot\.."
-if ([System.IO.Path]::IsPathRooted($OutputPath)) {
-    $outputFullPath = [System.IO.Path]::GetFullPath($OutputPath)
-} else {
-    $outputFullPath = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $OutputPath))
-}
+## الخيار المجهز في هذا المشروع
 
-$tempRoot = Join-Path $env:TEMP ("desert-tycoon-small-upload-" + [guid]::NewGuid().ToString("N"))
-New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+أضفت workflow في:
 
-function Copy-ProjectItem {
-    param(
-        [Parameter(Mandatory=$true)][string]$RelativePath
-    )
+```text
+.github/workflows/ios-ipa.yml
+```
 
-    $source = Join-Path $projectRoot $RelativePath
-    $destination = Join-Path $tempRoot $RelativePath
-    $destinationParent = Split-Path $destination -Parent
-    New-Item -ItemType Directory -Force -Path $destinationParent | Out-Null
-    Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force
-}
+بعد رفع المشروع إلى GitHub، افتح:
 
-Write-Host "Preparing small GitHub upload package..."
-Write-Host "Project: $projectRoot"
+```text
+Settings -> Secrets and variables -> Actions -> New repository secret
+```
 
-$items = @(
-    ".github",
-    "ios-scaffold\App",
-    "ios-scaffold\build_ipa.sh",
-    "ios-scaffold\ExportOptions.plist",
-    "ios-scaffold\project.yml",
-    "README_AR.md",
-    "FASTEST_IPHONE_INSTALL_WINDOWS_AR.md",
-    "BUILD_WITHOUT_MAC_AR.md",
-    "MIGRATION_REPORT.md",
-    "analysis",
-    "tools"
-)
+وأضف الأسرار التالية:
 
-foreach ($item in $items) {
-    Copy-ProjectItem -RelativePath $item
-}
+```text
+DEVELOPMENT_TEAM
+KEYCHAIN_PASSWORD
+BUILD_CERTIFICATE_BASE64
+P12_PASSWORD
+BUILD_PROVISION_PROFILE_BASE64
+```
 
-$resourcesDestination = Join-Path $tempRoot "ios-scaffold\Resources"
-New-Item -ItemType Directory -Force -Path $resourcesDestination | Out-Null
-Get-ChildItem -LiteralPath (Join-Path $projectRoot "ios-scaffold\Resources") -File | ForEach-Object {
-    Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $resourcesDestination $_.Name) -Force
-}
+اختياري عند وجود أكثر من شهادة توقيع في الحساب:
 
-if (Test-Path -LiteralPath $outputFullPath) {
-    Remove-Item -LiteralPath $outputFullPath -Force
-}
+```text
+CODE_SIGN_IDENTITY
+```
 
-Compress-Archive -Path (Join-Path $tempRoot "*") -DestinationPath $outputFullPath -Force
-Remove-Item -LiteralPath $tempRoot -Recurse -Force
+ثم شغّل:
 
-Write-Host ""
-Write-Host "Done:"
-Write-Host $outputFullPath
-Write-Host ""
-Write-Host "This package excludes portable-assets and LegacyAssets so GitHub web upload stays below 25MB."
-Write-Host "Extract it, then upload the extracted files and folders to GitHub."
+```text
+Actions -> Build iOS IPA -> Run workflow
+```
+
+اختر `debugging` للتثبيت على جهازك المسجل في حساب Apple Developer، أو `app-store-connect` لتجهيز ملف مناسب لمسار TestFlight/App Store.
+
+## إنشاء شهادة من Windows
+
+ثبّت OpenSSL، ثم نفذ:
+
+```powershell
+openssl genrsa -out ios_signing.key 2048
+openssl req -new -key ios_signing.key -out ios_signing.csr
+```
+
+افتح Apple Developer:
+
+```text
+Certificates, IDs & Profiles -> Certificates -> Add
+```
+
+اختر نوع الشهادة المناسب:
+
+- Apple Development: للتثبيت التجريبي على أجهزة مسجلة.
+- Apple Distribution: لـ TestFlight أو App Store.
+
+ارفع ملف `ios_signing.csr`، ثم حمّل ملف الشهادة `.cer`.
+
+حوّل الشهادة إلى `.p12`:
+
+```powershell
+openssl x509 -in ios_distribution.cer -inform DER -out ios_distribution.pem -outform PEM
+openssl pkcs12 -export -inkey ios_signing.key -in ios_distribution.pem -out ios_distribution.p12 -name "iOS Signing"
+```
+
+كلمة المرور التي تختارها في أمر `pkcs12` ضعها في secret باسم:
+
+```text
+P12_PASSWORD
+```
+
+## إنشاء Provisioning Profile
+
+من Apple Developer:
+
+```text
+Certificates, IDs & Profiles -> Identifiers
+```
+
+أنشئ App ID بنفس Bundle ID:
+
+```text
+ba.lum.deserttycoon
+```
+
+ثم:
+
+```text
+Profiles -> Add
+```
+
+اختر:
+
+- iOS App Development إذا كان export method هو `debugging`.
+- App Store إذا كان export method هو `app-store-connect`.
+
+اربطه بالشهادة السابقة، ثم حمّل ملف `.mobileprovision`.
+
+## تحويل الملفات إلى Base64 على Windows
+
+لملف الشهادة:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("ios_distribution.p12")) | Set-Clipboard
+```
+
+الصق الناتج في GitHub secret:
+
+```text
+BUILD_CERTIFICATE_BASE64
+```
+
+لملف provisioning profile:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("profile.mobileprovision")) | Set-Clipboard
+```
+
+الصق الناتج في GitHub secret:
+
+```text
+BUILD_PROVISION_PROFILE_BASE64
+```
+
+## ملاحظات مهمة
+
+- ملف IPA للتثبيت المباشر على iPhone يحتاج جهازك مسجلاً داخل Apple Developer إذا كان Development أو Ad Hoc.
+- TestFlight يتطلب App Store Connect وتوقيع Distribution.
+- هذا المشروع الحالي scaffold قابل للبناء، لكنه ليس نسخة كاملة من منطق لعبة Android الأصلية لأن كود APK لا يعمل على iOS مباشرة.

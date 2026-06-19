@@ -43,9 +43,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<key>NSContactsUsageDescription</key>
-	<string>يحتاج التطبيق إلى الوصول إلى جهات الاتصال بعد موافقتك.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>يحتاج التطبيق إلى حفظ محتوى في مكتبة الصور.</string>
 </dict>
 </plist>

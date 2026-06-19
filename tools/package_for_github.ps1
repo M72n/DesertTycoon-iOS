@@ -19,8 +19,18 @@ New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
 
 $excludeTopLevel = @(
     ".git",
+    ".agents",
     "build",
-    "DerivedData"
+    "DerivedData",
+    "apk-extracted",
+    "tmp-xcode-logs",
+    "tmp-xcode-logs-2",
+    "tmp-xcode-logs-3",
+    "DesertTycoon-iOS-GitHub-Upload-SMALL",
+    "DesertTycoon-iOS-Metadata-Upload",
+    "DesertTycoon-iOS-GitHub-Upload.zip",
+    "DesertTycoon-iOS-GitHub-Upload-SMALL.zip",
+    "DesertTycoon-iOS-Metadata-Upload.zip"
 )
 
 Get-ChildItem -LiteralPath $projectRoot -Force | ForEach-Object {

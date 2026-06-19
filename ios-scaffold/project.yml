@@ -6,7 +6,7 @@ options:
   developmentLanguage: ar
 settings:
   base:
-    SWIFT_VERSION: "5"
+    SWIFT_VERSION: 6.0
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     MARKETING_VERSION: "1.2.0"
     CURRENT_PROJECT_VERSION: "1821"
@@ -22,18 +22,8 @@ targets:
     sources:
       - path: App
     resources:
-      - path: Resources/LegacyAssets
-        type: folder
-        buildPhase: resources
-      - path: Resources/preview_camel.png
-      - path: Resources/preview_counter.png
-      - path: Resources/preview_phase1_map.png
-      - path: Resources/preview_phase2_map.png
-      - path: Resources/preview_phase3_map.png
-      - path: Resources/preview_souk_bg.jpg
-      - path: Resources/preview_splash_arabic.jpg
-      - path: Resources/preview_splash_english.jpg
-      - path: App/Assets.xcassets
+      - path: Resources
+        optional: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ba.lum.deserttycoon
