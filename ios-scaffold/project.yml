@@ -24,6 +24,18 @@ targets:
     resources:
       - path: Resources
         optional: true
+      - path: Resources/LegacyAssets/Icon.png
+      - path: Resources/LegacyAssets/vunglepub_sdk_close.png
+      - path: Resources/LegacyAssets/vunglepub_sdk_mute.png
+      - path: Resources/LegacyAssets/vunglepub_sdk_unmute.png
+      - path: Resources/LegacyAssets/fonts
+        buildPhase: resources
+      - path: Resources/LegacyAssets/iphone-hd
+        buildPhase: resources
+      - path: Resources/LegacyAssets/movies
+        buildPhase: resources
+      - path: Resources/LegacyAssets/music_sound
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ba.lum.deserttycoon
