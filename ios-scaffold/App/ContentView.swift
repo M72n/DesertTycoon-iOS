@@ -9,7 +9,7 @@ struct ContentView: View {
         GeometryReader { proxy in
             SpriteView(scene: sceneHost.scene, options: [.ignoresSiblingOrder])
                 .ignoresSafeArea()
-                .background(Color.black)
+                .background(Color(red: 0.72, green: 0.58, blue: 0.38))
                 .onAppear {
                     sceneHost.resize(to: proxy.size)
                 }
@@ -26,7 +26,7 @@ private final class GameSceneHost: ObservableObject {
     let scene: DesertTycoonScene
 
     init() {
-        scene = DesertTycoonScene(size: CGSize(width: 390, height: 844))
+        scene = DesertTycoonScene(size: CGSize(width: 844, height: 390))
         scene.scaleMode = .resizeFill
     }
 

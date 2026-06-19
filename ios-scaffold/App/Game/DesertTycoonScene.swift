@@ -35,6 +35,11 @@ final class DesertTycoonScene: SKScene {
         }
     }
 
+    private enum MapVisualMode {
+        case referenceBackdrop
+        case renderedTileMap
+    }
+
     private let worldNode = SKNode()
     private let mapLayer = SKNode()
     private let buildLayer = SKNode()
@@ -42,6 +47,9 @@ final class DesertTycoonScene: SKScene {
     private let cameraNode = SKCameraNode()
     private let hudNode = SKNode()
     private var musicNode: SKAudioNode?
+    private var videoNode: SKVideoNode?
+    private var splashNode: SKSpriteNode?
+    private var referenceOverlayNode: SKNode?
 
     private var gameAtlas: CocosTextureAtlas?
     private var soukAtlas: CocosTextureAtlas?
@@ -49,7 +57,9 @@ final class DesertTycoonScene: SKScene {
     private var camelAtlas: CocosTextureAtlas?
     private var rigAtlas: CocosTextureAtlas?
 
-    private var currentPhase: DesertTycoonPhase = .phaseOne
+    private var currentPhase: DesertTycoonPhase = .phaseThree
+    private var mapVisualMode: MapVisualMode = .renderedTileMap
+    private var referenceBackdropIndex = 0
     private var resources = DesertTycoonResources()
     private var resourceLabels: [DesertTycoonResource: SKLabelNode] = [:]
     private var selectedBuildType: DesertTycoonBuildType = .residential
@@ -61,6 +71,7 @@ final class DesertTycoonScene: SKScene {
     private var mapSize: CGSize = .zero
     private var didSetUpScene = false
     private var didFitInitialCamera = false
+    private var didShowLaunchSplash = false
     private var touchStartLocation: CGPoint?
     private var touchStartedOnHUD = false
     private var lastUpdateTime: TimeInterval = 0
@@ -71,14 +82,14 @@ final class DesertTycoonScene: SKScene {
     override init(size: CGSize) {
         super.init(size: size)
         anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        backgroundColor = .black
+        backgroundColor = UIColor(red: 0.72, green: 0.58, blue: 0.38, alpha: 1.0)
         physicsWorld.gravity = .zero
     }
 
     required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        backgroundColor = .black
+        backgroundColor = UIColor(red: 0.72, green: 0.58, blue: 0.38, alpha: 1.0)
         physicsWorld.gravity = .zero
     }
 
@@ -113,6 +124,8 @@ final class DesertTycoonScene: SKScene {
         }
 
         layoutHUD()
+        resizeLaunchSplash()
+        showLaunchSplashIfNeeded()
     }
 
     private func setUpScene() {
@@ -120,11 +133,11 @@ final class DesertTycoonScene: SKScene {
         worldNode.removeAllChildren()
         cameraNode.removeAllChildren()
 
-        gameAtlas = CocosTextureAtlas(plistCandidates: ["iphone-hd/game-images.plist"])
-        soukAtlas = CocosTextureAtlas(plistCandidates: ["iphone-hd/souk-images.plist"])
-        balloonAtlas = CocosTextureAtlas(plistCandidates: ["iphone-hd/balloons-images.plist"])
-        camelAtlas = CocosTextureAtlas(plistCandidates: ["iphone-hd/traveling/CamelTraveling/TravelingCamel-hd.plist"])
-        rigAtlas = CocosTextureAtlas(plistCandidates: ["iphone-hd/traveling/MediumRigTraveling/TravelingMediumRig-hd.plist"])
+        gameAtlas = CocosTextureAtlas(plistCandidates: ["iphone-hd-upscaled/game-images.plist", "iphone-hd/game-images.plist"])
+        soukAtlas = CocosTextureAtlas(plistCandidates: ["iphone-hd-upscaled/souk-images.plist", "iphone-hd/souk-images.plist"])
+        balloonAtlas = CocosTextureAtlas(plistCandidates: ["iphone-hd-upscaled/balloons-images.plist", "iphone-hd/balloons-images.plist"])
+        camelAtlas = CocosTextureAtlas(plistCandidates: ["iphone-hd-upscaled/traveling/CamelTraveling/TravelingCamel-hd.plist", "iphone-hd/traveling/CamelTraveling/TravelingCamel-hd.plist"])
+        rigAtlas = CocosTextureAtlas(plistCandidates: ["iphone-hd-upscaled/traveling/MediumRigTraveling/TravelingMediumRig-hd.plist", "iphone-hd/traveling/MediumRigTraveling/TravelingMediumRig-hd.plist"])
 
         worldNode.position = .zero
         addChild(worldNode)
@@ -138,7 +151,9 @@ final class DesertTycoonScene: SKScene {
         camera = cameraNode
 
         loadPhase(currentPhase)
-        spawnTraveler()
+        if mapVisualMode == .renderedTileMap {
+            spawnTraveler()
+        }
         startBackgroundMusic()
         layoutHUD()
     }
@@ -154,8 +169,10 @@ final class DesertTycoonScene: SKScene {
         didFitInitialCamera = false
         placedAssets.removeAll()
         occupiedTiles.removeAll()
+        referenceOverlayNode?.removeFromParent()
+        referenceOverlayNode = nil
 
-        guard let texture = BundleAssetResolver.texture(candidates: phase.mapCandidates) else {
+        guard let texture = textureForPhase(phase) else {
             return
         }
 
@@ -179,9 +196,70 @@ final class DesertTycoonScene: SKScene {
         worldNode.physicsBody?.isDynamic = false
     }
 
+    private func textureForPhase(_ phase: DesertTycoonPhase) -> SKTexture? {
+        let referencePaths = phase.referenceBackdropPaths
+        if !referencePaths.isEmpty {
+            for offset in 0..<referencePaths.count {
+                let index = (referenceBackdropIndex + offset) % referencePaths.count
+                if let texture = BundleAssetResolver.texture(candidates: [referencePaths[index]]) {
+                    referenceBackdropIndex = index
+                    mapVisualMode = .referenceBackdrop
+                    return texture
+                }
+            }
+        }
+
+        mapVisualMode = .renderedTileMap
+        return BundleAssetResolver.texture(candidates: phase.mapCandidates)
+    }
+
+    private func showLaunchSplashIfNeeded() {
+        guard !didShowLaunchSplash,
+              let texture = BundleAssetResolver.texture(candidates: [
+                "ReferenceBackdrops/apk_splash.png",
+                "iphone-hd/splash/dt_splash_arabic.jpg",
+                "iphone-hd/splash/dt_splash_english.jpg"
+              ]) else {
+            return
+        }
+
+        didShowLaunchSplash = true
+        let node = SKSpriteNode(texture: texture)
+        node.position = .zero
+        node.zPosition = 9000
+        node.size = coverSize(for: texture.size())
+        cameraNode.addChild(node)
+        splashNode = node
+
+        node.run(.sequence([
+            .wait(forDuration: 1.4),
+            .fadeOut(withDuration: 0.35),
+            .removeFromParent()
+        ]))
+    }
+
+    private func resizeLaunchSplash() {
+        guard let splashNode, let texture = splashNode.texture else { return }
+        splashNode.size = coverSize(for: texture.size())
+    }
+
+    private func coverSize(for textureSize: CGSize) -> CGSize {
+        guard textureSize.width > 0, textureSize.height > 0, size.width > 0, size.height > 0 else {
+            return size
+        }
+
+        let scale = max(size.width / textureSize.width, size.height / textureSize.height)
+        return CGSize(width: textureSize.width * scale, height: textureSize.height * scale)
+    }
+
     private func layoutHUD() {
         hudNode.removeAllChildren()
         resourceLabels.removeAll()
+
+        if mapVisualMode == .referenceBackdrop {
+            layoutReferenceTouchZones()
+            return
+        }
 
         let topY = size.height / 2 - 34
         let leftX = -size.width / 2 + 20
@@ -212,10 +290,14 @@ final class DesertTycoonScene: SKScene {
             currentX += resourceSpacing
         }
 
+        let videoButton = mediaButton(name: "video:intro", frameName: "souk_screen/icons/VideoIcon.png")
+        videoButton.position = CGPoint(x: size.width / 2 - 34, y: topY)
+        hudNode.addChild(videoButton)
+
         let bottomY = -size.height / 2 + 46
         if let bottomBarTexture = gameAtlas?.texture(named: "main_screen_ui/bottom_bar/bottom_bar.png") {
             let bottomBar = SKSpriteNode(texture: bottomBarTexture)
-            bottomBar.size = CGSize(width: min(size.width, 520), height: 86)
+            bottomBar.size = CGSize(width: size.width, height: 92)
             bottomBar.position = CGPoint(x: 0, y: -size.height / 2 + 38)
             bottomBar.alpha = 0.94
             bottomBar.zPosition = 998
@@ -236,17 +318,60 @@ final class DesertTycoonScene: SKScene {
         updateResourceLabels()
     }
 
+    private func layoutReferenceTouchZones() {
+        addReferenceTouchZone(
+            name: "reference:showGoals",
+            rect: CGRect(x: -size.width / 2, y: -size.height / 2, width: 120, height: 100)
+        )
+        addReferenceTouchZone(
+            name: "reference:showMenu",
+            rect: CGRect(x: size.width / 2 - 120, y: -size.height / 2, width: 120, height: 100)
+        )
+        addReferenceTouchZone(
+            name: "reference:cycleBackdrop",
+            rect: CGRect(x: -size.width / 2 + 120, y: -size.height / 2, width: size.width - 240, height: 100)
+        )
+        addReferenceTouchZone(
+            name: "reference:nextPhase",
+            rect: CGRect(x: -size.width / 2, y: size.height / 2 - 120, width: size.width * 0.58, height: 120)
+        )
+        addReferenceTouchZone(
+            name: "video:intro",
+            rect: CGRect(x: size.width / 2 - 110, y: size.height / 2 - 110, width: 100, height: 100)
+        )
+    }
+
+    private func addReferenceTouchZone(name: String, rect: CGRect) {
+        let node = SKShapeNode(rect: rect)
+        node.name = name
+        node.fillColor = UIColor(white: 1.0, alpha: 0.01)
+        node.strokeColor = .clear
+        node.lineWidth = 0
+        node.zPosition = 1000
+        hudNode.addChild(node)
+    }
+
     private func buildButton(for buildType: DesertTycoonBuildType) -> SKNode {
         let root = SKNode()
         root.name = "build:\(buildType.rawValue)"
         root.zPosition = 1000
 
-        let background = SKShapeNode(rectOf: CGSize(width: 46, height: 46), cornerRadius: 8)
-        background.fillColor = selectedBuildType == buildType ? UIColor(red: 0.94, green: 0.76, blue: 0.26, alpha: 0.9) : UIColor(white: 0.02, alpha: 0.72)
-        background.strokeColor = selectedBuildType == buildType ? .white : UIColor(white: 1.0, alpha: 0.35)
-        background.lineWidth = selectedBuildType == buildType ? 2 : 1
+        let background = sprite(from: soukAtlas, frameName: "souk_screen/souk_item_frame.png", fallbackSize: CGSize(width: 48, height: 48))
+        background.size = CGSize(width: 48, height: 48)
+        background.alpha = selectedBuildType == buildType ? 1.0 : 0.78
+        background.zPosition = 999
         background.name = root.name
         root.addChild(background)
+
+        if selectedBuildType == buildType {
+            let selection = SKShapeNode(rectOf: CGSize(width: 46, height: 46), cornerRadius: 8)
+            selection.fillColor = .clear
+            selection.strokeColor = UIColor(red: 0.95, green: 0.78, blue: 0.28, alpha: 1.0)
+            selection.lineWidth = 3
+            selection.zPosition = 1002
+            selection.name = root.name
+            root.addChild(selection)
+        }
 
         let icon = sprite(from: soukAtlas, frameName: buildType.iconFrame, fallbackSize: CGSize(width: 30, height: 30))
         icon.size = CGSize(width: 30, height: 30)
@@ -264,6 +389,27 @@ final class DesertTycoonScene: SKScene {
         cost.zPosition = 1001
         cost.name = root.name
         root.addChild(cost)
+
+        return root
+    }
+
+    private func mediaButton(name: String, frameName: String) -> SKNode {
+        let root = SKNode()
+        root.name = name
+        root.zPosition = 1000
+
+        let background = SKShapeNode(rectOf: CGSize(width: 40, height: 40), cornerRadius: 8)
+        background.fillColor = UIColor(white: 0.02, alpha: 0.72)
+        background.strokeColor = UIColor(white: 1.0, alpha: 0.35)
+        background.lineWidth = 1
+        background.name = name
+        root.addChild(background)
+
+        let icon = sprite(from: soukAtlas, frameName: frameName, fallbackSize: CGSize(width: 26, height: 26))
+        icon.size = CGSize(width: 26, height: 26)
+        icon.name = name
+        icon.zPosition = 1001
+        root.addChild(icon)
 
         return root
     }
@@ -313,8 +459,13 @@ final class DesertTycoonScene: SKScene {
 
         let widthScale = mapSize.width / size.width
         let heightScale = mapSize.height / size.height
-        let fitScale = max(widthScale, heightScale)
-        let playableScale = fitScale * 0.45
+        let playableScale: CGFloat
+        if mapVisualMode == .referenceBackdrop {
+            playableScale = min(widthScale, heightScale)
+        } else {
+            let fitScale = max(widthScale, heightScale)
+            playableScale = fitScale * 0.45
+        }
 
         cameraNode.position = .zero
         cameraNode.setScale(clampedScale(playableScale))
@@ -399,6 +550,12 @@ final class DesertTycoonScene: SKScene {
                 if let name = candidate.name, name.hasPrefix("build:") {
                     return name
                 }
+                if let name = candidate.name, name.hasPrefix("video:") {
+                    return name
+                }
+                if let name = candidate.name, name.hasPrefix("reference:") {
+                    return name
+                }
                 current = candidate.parent
             }
         }
@@ -413,7 +570,93 @@ final class DesertTycoonScene: SKScene {
                 selectedBuildType = buildType
                 layoutHUD()
             }
+        } else if actionName.hasPrefix("video:") {
+            playIntroVideo()
+        } else if actionName == "reference:closeOverlay" {
+            closeReferenceOverlay()
+        } else if actionName == "reference:showMenu" {
+            presentReferenceOverlay(candidates: ["iphone-hd/souk_screen/souk_bg.jpg"])
+        } else if actionName == "reference:showGoals" {
+            presentReferenceOverlay(candidates: [
+                "iphone-hd/dialogues_ui/tasks/task_menu_bg.png",
+                "iphone-hd/dialogues_ui/goal_completion/goal_completion_bg.png"
+            ])
+        } else if actionName == "reference:nextPhase" {
+            advancePhase(by: 1)
+        } else if actionName == "reference:previousPhase" {
+            advancePhase(by: -1)
+        } else if actionName == "reference:cycleBackdrop" {
+            cycleReferenceBackdrop()
         }
+    }
+
+    private func advancePhase(by delta: Int) {
+        let phases = DesertTycoonPhase.allCases
+        guard let currentIndex = phases.firstIndex(of: currentPhase) else { return }
+
+        let nextIndex = (currentIndex + delta + phases.count) % phases.count
+        referenceBackdropIndex = 0
+        loadPhase(phases[nextIndex])
+        if mapVisualMode == .renderedTileMap {
+            spawnTraveler()
+        }
+        layoutCamera()
+        playSound(candidates: ["music_sound/LevelCompletion.mp3"])
+    }
+
+    private func cycleReferenceBackdrop() {
+        let count = currentPhase.referenceBackdropPaths.count
+        guard mapVisualMode == .referenceBackdrop, count > 1 else {
+            showTapFeedback(at: cameraNode.position, color: .green)
+            return
+        }
+
+        referenceBackdropIndex = (referenceBackdropIndex + 1) % count
+        loadPhase(currentPhase)
+        layoutCamera()
+        playSound(candidates: ["music_sound/GoalCompletion.mp3"])
+    }
+
+    private func presentReferenceOverlay(candidates: [String]) {
+        guard let texture = BundleAssetResolver.texture(candidates: candidates) else {
+            showTapFeedback(at: cameraNode.position, color: .red)
+            return
+        }
+
+        closeReferenceOverlay()
+
+        let root = SKNode()
+        root.zPosition = 8500
+        root.name = "reference:closeOverlay"
+
+        let blocker = SKShapeNode(rect: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+        blocker.fillColor = UIColor(white: 0.0, alpha: 0.42)
+        blocker.strokeColor = .clear
+        blocker.name = root.name
+        root.addChild(blocker)
+
+        let panel = SKSpriteNode(texture: texture)
+        panel.size = fitSize(for: texture.size(), maximum: CGSize(width: size.width * 0.92, height: size.height * 0.92))
+        panel.position = .zero
+        panel.name = root.name
+        root.addChild(panel)
+
+        cameraNode.addChild(root)
+        referenceOverlayNode = root
+    }
+
+    private func closeReferenceOverlay() {
+        referenceOverlayNode?.removeFromParent()
+        referenceOverlayNode = nil
+    }
+
+    private func fitSize(for textureSize: CGSize, maximum: CGSize) -> CGSize {
+        guard textureSize.width > 0, textureSize.height > 0, maximum.width > 0, maximum.height > 0 else {
+            return maximum
+        }
+
+        let scale = min(maximum.width / textureSize.width, maximum.height / textureSize.height)
+        return CGSize(width: textureSize.width * scale, height: textureSize.height * scale)
     }
 
     private func handleMapTap(at location: CGPoint) {
@@ -450,6 +693,7 @@ final class DesertTycoonScene: SKScene {
                         asset.bubbleNode.isHidden = true
                         updateResourceLabels()
                         showTapFeedback(at: asset.node.position, color: .green)
+                        playSound(candidates: ["music_sound/GoalCompletion.mp3", "music_sound/LevelCompletion.mp3"])
                     }
                     return true
                 }
@@ -502,6 +746,7 @@ final class DesertTycoonScene: SKScene {
         )
         placedAssets[id] = placedAsset
         buildLayer.addChild(root)
+        playSound(candidates: ["music_sound/EnergyPack.mp3"])
     }
 
     private func showTapFeedback(at location: CGPoint, color: UIColor) {
@@ -555,6 +800,21 @@ final class DesertTycoonScene: SKScene {
     private func tileCoordinate(for scenePoint: CGPoint) -> (column: Int, row: Int)? {
         guard mapSize.width > 0, mapSize.height > 0 else { return nil }
 
+        if mapVisualMode == .referenceBackdrop {
+            let imageX = scenePoint.x + mapSize.width / 2
+            let imageY = mapSize.height / 2 - scenePoint.y
+            guard imageX >= 0, imageY >= 0, imageX <= mapSize.width, imageY <= mapSize.height else {
+                return nil
+            }
+
+            let column = Int((imageX / mapSize.width) * CGFloat(currentPhase.mapColumns))
+            let row = Int((imageY / mapSize.height) * CGFloat(currentPhase.mapRows))
+            return (
+                min(max(column, 0), currentPhase.mapColumns - 1),
+                min(max(row, 0), currentPhase.mapRows - 1)
+            )
+        }
+
         let halfTileWidth = currentPhase.tileSize.width / 2
         let halfTileHeight = currentPhase.tileSize.height / 2
         let imageX = scenePoint.x + mapSize.width / 2
@@ -575,6 +835,15 @@ final class DesertTycoonScene: SKScene {
     }
 
     private func positionForTile(column: Int, row: Int) -> CGPoint {
+        if mapVisualMode == .referenceBackdrop, mapSize.width > 0, mapSize.height > 0 {
+            let imageX = (CGFloat(column) + 0.5) / CGFloat(currentPhase.mapColumns) * mapSize.width
+            let imageY = (CGFloat(row) + 0.5) / CGFloat(currentPhase.mapRows) * mapSize.height
+            return CGPoint(
+                x: imageX - mapSize.width / 2,
+                y: mapSize.height / 2 - imageY
+            )
+        }
+
         let halfTileWidth = currentPhase.tileSize.width / 2
         let halfTileHeight = currentPhase.tileSize.height / 2
         let imageX = CGFloat(column - row) * halfTileWidth + CGFloat(currentPhase.mapRows - 1) * halfTileWidth + halfTileWidth
@@ -591,6 +860,10 @@ final class DesertTycoonScene: SKScene {
     }
 
     private func spawnTraveler() {
+        guard mapVisualMode == .renderedTileMap else {
+            return
+        }
+
         guard let textures = camelAtlas?.textures(withPrefix: "Camel_Happy_Pen_FINAL"), let firstTexture = textures.first else {
             return
         }
@@ -611,6 +884,48 @@ final class DesertTycoonScene: SKScene {
         ]
         let moves = route.map { SKAction.move(to: $0, duration: 3.2) }
         traveler.run(.repeatForever(.sequence(moves)))
+    }
+
+    private func playIntroVideo() {
+        if let videoNode {
+            videoNode.pause()
+            videoNode.removeFromParent()
+            self.videoNode = nil
+            return
+        }
+
+        guard let url = BundleAssetResolver.url(candidates: [
+            "movies/Narrative-Final_v2012_05_30-ar_subs.mp4",
+            "movies/Phase2Tutorial.mp4",
+            "movies/Phase3Tutorial.mp4"
+        ]) else {
+            return
+        }
+
+        let node = SKVideoNode(url: url)
+        node.size = size
+        node.position = .zero
+        node.zPosition = 5000
+        node.name = "video:close"
+        hudNode.addChild(node)
+        node.play()
+        videoNode = node
+    }
+
+    private func playSound(candidates: [String]) {
+        guard let url = BundleAssetResolver.url(candidates: candidates) else {
+            return
+        }
+
+        let node = SKAudioNode(url: url)
+        node.autoplayLooped = false
+        node.run(.changeVolume(to: 0.45, duration: 0))
+        addChild(node)
+        node.run(.play())
+        node.run(.sequence([
+            .wait(forDuration: 2.0),
+            .removeFromParent()
+        ]))
     }
 
     override func update(_ currentTime: TimeInterval) {

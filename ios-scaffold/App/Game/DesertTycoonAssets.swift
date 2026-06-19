@@ -6,31 +6,51 @@ enum DesertTycoonPhase: CaseIterable {
     case phaseTwo
     case phaseThree
 
+    var referenceBackdropPaths: [String] {
+        switch self {
+        case .phaseOne:
+            return [
+                "ReferenceBackdrops/apk_phase1_village_en.png"
+            ]
+        case .phaseTwo:
+            return [
+                "ReferenceBackdrops/apk_phase2_overview_en.png",
+                "ReferenceBackdrops/apk_phase2_close_en.png"
+            ]
+        case .phaseThree:
+            return [
+                "ReferenceBackdrops/apk_phase3_overview_ar.png",
+                "ReferenceBackdrops/apk_phase3_collect_en.png",
+                "ReferenceBackdrops/apk_final.png"
+            ]
+        }
+    }
+
     var mapCandidates: [String] {
         switch self {
         case .phaseOne:
             return [
+                "iphone-hd-upscaled/maps/DT_Phase1_iso_full.png",
                 "GeneratedMaps/DT_Phase1_iso_full.png",
                 "GeneratedMaps/DT_Phase1_ortho_full.png",
-                "iphone-hd-upscaled/maps/DT_Phase1_ortho_full.png",
-                "iphone-hd/maps/DT_Phase1_ortho.png",
-                "preview_phase1_map.png"
+                "preview_phase1_map.png",
+                "iphone-hd/maps/DT_Phase1_ortho.png"
             ]
         case .phaseTwo:
             return [
+                "iphone-hd-upscaled/maps/DT_Phase2_iso_full.png",
                 "GeneratedMaps/DT_Phase2_iso_full.png",
                 "GeneratedMaps/DT_Phase2_ortho_full.png",
-                "iphone-hd-upscaled/maps/DT_Phase2_ortho_full.png",
-                "iphone-hd/maps/DT_Phase2_ortho.png",
-                "preview_phase2_map.png"
+                "preview_phase2_map.png",
+                "iphone-hd/maps/DT_Phase2_ortho.png"
             ]
         case .phaseThree:
             return [
+                "iphone-hd-upscaled/maps/DT_Phase3_iso_full.png",
                 "GeneratedMaps/DT_Phase3_iso_full.png",
                 "GeneratedMaps/DT_Phase3_ortho_full.png",
-                "iphone-hd-upscaled/maps/DT_Phase3_ortho_full.png",
-                "iphone-hd/maps/DT_Phase3_ortho.png",
-                "preview_phase3_map.png"
+                "preview_phase3_map.png",
+                "iphone-hd/maps/DT_Phase3_ortho.png"
             ]
         }
     }

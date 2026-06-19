@@ -12,37 +12,47 @@ final class CocosTextureAtlas {
     private let frames: [String: Frame]
 
     init?(plistCandidates: [String]) {
-        guard let plistURL = BundleAssetResolver.url(candidates: plistCandidates),
-              let plist = NSDictionary(contentsOf: plistURL) as? [String: Any],
-              let frameDictionary = plist["frames"] as? [String: Any],
-              let metadata = plist["metadata"] as? [String: Any],
-              let textureFileName = (metadata["realTextureFileName"] as? String) ?? (metadata["textureFileName"] as? String) else {
+        guard let loaded = Self.loadAtlas(plistCandidates: plistCandidates) else {
             return nil
         }
 
-        let plistPath = plistCandidates.first ?? plistURL.lastPathComponent
-        let plistDirectory = (plistPath as NSString).deletingLastPathComponent
-        let texturePath = plistDirectory.isEmpty ? textureFileName : "\(plistDirectory)/\(textureFileName)"
+        texture = loaded.texture
+        textureSize = loaded.textureSize
+        frames = loaded.frames
+    }
 
-        guard let baseTexture = BundleAssetResolver.texture(candidates: [texturePath]) else {
-            return nil
-        }
-
-        texture = baseTexture
-        textureSize = baseTexture.size()
-
-        var parsedFrames: [String: Frame] = [:]
-        for (name, value) in frameDictionary {
-            guard let frameData = value as? [String: Any],
-                  let frameString = frameData["frame"] as? String,
-                  let rect = Self.parseTexturePackerRect(frameString) else {
+    private static func loadAtlas(plistCandidates: [String]) -> (texture: SKTexture, textureSize: CGSize, frames: [String: Frame])? {
+        for plistCandidate in plistCandidates {
+            guard let plistURL = BundleAssetResolver.url(candidates: [plistCandidate]),
+                  let plist = NSDictionary(contentsOf: plistURL) as? [String: Any],
+                  let frameDictionary = plist["frames"] as? [String: Any],
+                  let metadata = plist["metadata"] as? [String: Any],
+                  let textureFileName = (metadata["realTextureFileName"] as? String) ?? (metadata["textureFileName"] as? String) else {
                 continue
             }
 
-            parsedFrames[name] = Frame(rect: rect)
+            let plistDirectory = (plistCandidate as NSString).deletingLastPathComponent
+            let texturePath = plistDirectory.isEmpty ? textureFileName : "\(plistDirectory)/\(textureFileName)"
+
+            guard let baseTexture = BundleAssetResolver.texture(candidates: [texturePath]) else {
+                continue
+            }
+
+            var parsedFrames: [String: Frame] = [:]
+            for (name, value) in frameDictionary {
+                guard let frameData = value as? [String: Any],
+                      let frameString = frameData["frame"] as? String,
+                      let rect = Self.parseTexturePackerRect(frameString) else {
+                    continue
+                }
+
+                parsedFrames[name] = Frame(rect: rect)
+            }
+
+            return (baseTexture, baseTexture.size(), parsedFrames)
         }
 
-        frames = parsedFrames
+        return nil
     }
 
     func texture(named frameName: String) -> SKTexture? {
