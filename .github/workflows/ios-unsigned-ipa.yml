@@ -32,6 +32,7 @@ jobs:
           set -eo pipefail
           mkdir -p build/logs
           xcodebuild -list -project DesertTycoon.xcodeproj | tee build/logs/xcodebuild-list.log
+
           xcodebuild \
             -project DesertTycoon.xcodeproj \
             -scheme DesertTycoon \
@@ -52,22 +53,20 @@ jobs:
           set -euo pipefail
           app_path="build/DerivedData/Build/Products/Release-iphoneos/DesertTycoon.app"
           if [[ ! -d "$app_path" ]]; then
-            echo "::error::App bundle not found"
+            echo "::error::App bundle not found at $app_path"
+            find build/DerivedData/Build/Products -maxdepth 3 -type d -name "*.app" -print || true
             exit 1
           fi
-          # Copy LegacyAssets contents directly into the app bundle
-          cp -R Resources/LegacyAssets/fonts "$app_path/"
-          cp -R Resources/LegacyAssets/iphone-hd "$app_path/"
-          cp -R Resources/LegacyAssets/movies "$app_path/"
-          cp -R Resources/LegacyAssets/music_sound "$app_path/"
-          cp Resources/LegacyAssets/Icon.png "$app_path/"
-          cp Resources/LegacyAssets/vunglepub_sdk_close.png "$app_path/"
-          cp Resources/LegacyAssets/vunglepub_sdk_mute.png "$app_path/"
-          cp Resources/LegacyAssets/vunglepub_sdk_unmute.png "$app_path/"
-          # Copy preview images
+
+          if [[ -d Resources/LegacyAssets ]]; then
+            cp -R Resources/LegacyAssets/. "$app_path/"
+          fi
+
           cp Resources/preview_*.png "$app_path/" 2>/dev/null || true
           cp Resources/preview_*.jpg "$app_path/" 2>/dev/null || true
-          echo "Assets copied. App bundle size:"
+
+          echo "Assets copied into app bundle:"
+          find "$app_path" -maxdepth 2 -type d | sort
           du -sh "$app_path"
 
       - name: Package unsigned IPA
@@ -76,6 +75,12 @@ jobs:
         run: |
           set -euo pipefail
           app_path="build/DerivedData/Build/Products/Release-iphoneos/DesertTycoon.app"
+          if [[ ! -d "$app_path" ]]; then
+            echo "::error::App bundle not found at $app_path"
+            find build/DerivedData/Build/Products -maxdepth 3 -type d -name "*.app" -print || true
+            exit 1
+          fi
+
           rm -rf build/unsigned-ipa
           mkdir -p build/unsigned-ipa/Payload
           cp -R "$app_path" build/unsigned-ipa/Payload/
