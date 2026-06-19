@@ -1,6 +1,7 @@
 import SpriteKit
 import UIKit
 
+@MainActor
 enum BundleAssetResolver {
     static func texture(candidates: [String]) -> SKTexture? {
         guard let image = image(candidates: candidates) else {

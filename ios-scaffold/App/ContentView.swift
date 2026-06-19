@@ -1,6 +1,7 @@
 import SpriteKit
 import SwiftUI
 
+@MainActor
 struct ContentView: View {
     @StateObject private var sceneHost = GameSceneHost()
 
@@ -20,6 +21,7 @@ struct ContentView: View {
     }
 }
 
+@MainActor
 private final class GameSceneHost: ObservableObject {
     let scene: DesertTycoonScene
 
