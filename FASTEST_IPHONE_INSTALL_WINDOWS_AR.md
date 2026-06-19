@@ -12,20 +12,20 @@ Sideloadly على Windows يوقّع IPA بحساب Apple ID ويثبته على
 افتح PowerShell داخل مجلد المشروع وشغّل:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\package_small_for_github.ps1
+powershell -ExecutionPolicy Bypass -File .\tools\package_for_github.ps1
 ```
 
 سيظهر ملف:
 
 ```text
-DesertTycoon-iOS-GitHub-Upload-SMALL.zip
+DesertTycoon-iOS-GitHub-Upload.zip
 ```
 
 ## 2. ارفع المشروع إلى GitHub
 
 1. افتح [github.com/new](https://github.com/new).
 2. أنشئ Repository جديد باسم `DesertTycoon-iOS`.
-3. فك ضغط ملف `DesertTycoon-iOS-GitHub-Upload-SMALL.zip`.
+3. فك ضغط ملف `DesertTycoon-iOS-GitHub-Upload.zip`.
 4. من صفحة Repository اختر `Add file -> Upload files`.
 5. اسحب كل الملفات والمجلدات التي خرجت من ZIP، ثم اضغط `Commit changes`.
 
