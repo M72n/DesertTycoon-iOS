@@ -24,7 +24,7 @@ struct ContentView: View {
                         headerBar(isWide: isWide)
 
                         if isWide {
-                            HStack(alignment: .stretch, spacing: 14) {
+                            HStack(alignment: .top, spacing: 14) {
                                 stagePanel
                                 controlPanel
                                     .frame(width: min(320, size.width * 0.32))
@@ -123,7 +123,7 @@ struct ContentView: View {
     }
 
     private var controlPanel: some View {
-        VStack(alignment: .stretch, spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             Picker("المشهد", selection: $selectedPanel) {
                 ForEach(GamePanel.allCases) { panel in
                     Text(panel.title).tag(panel)
