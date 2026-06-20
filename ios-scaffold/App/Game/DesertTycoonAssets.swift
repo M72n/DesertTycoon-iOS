@@ -163,7 +163,7 @@ struct DTStoreItem: Equatable {
         housingLimitBonus = 0
     }
 
-    var isLocked(at level: Int) -> Bool {
+    func isLocked(at level: Int) -> Bool {
         level < unlockLevel
     }
 }
@@ -174,6 +174,7 @@ struct DesertTycoonGameData {
     let storeItems: [DTStoreItem]
     let levelThresholds = [0, 20, 60, 130, 250, 420, 650, 950]
 
+    @MainActor
     static func load() -> DesertTycoonGameData {
         if let url = BundleAssetResolver.url(candidates: ["GameData/desert_tycoon_spec.json"]),
            let data = try? Data(contentsOf: url),
