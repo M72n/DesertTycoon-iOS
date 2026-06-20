@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>frames</key>
+	<dict>
+		<key>characters/arab_camel2.png</key>
+		<dict>
+			<key>frame</key>
+			<string>{{3.75,3.75},{826.875,1072.5}}</string>
+			<key>offset</key>
+			<string>{0,0}</string>
+			<key>rotated</key>
+			<false/>
+			<key>sourceColorRect</key>
+			<string>{{0,0},{826.875,1072.5}}</string>
+			<key>sourceSize</key>
+			<string>{826.875,1072.5}</string>
+		</dict>
+		<key>characters/camel_falcon.png</key>
+		<dict>
+			<key>frame</key>
+			<string>{{3.75,1081.875},{504.375,481.875}}</string>
+			<key>offset</key>
+			<string>{0,0}</string>
+			<key>rotated</key>
+			<false/>
+			<key>sourceColorRect</key>
+			<string>{{0,0},{504.375,481.875}}</string>
+			<key>sourceSize</key>
+			<string>{504.375,481.875}</string>
+		</dict>
+		<key>characters/man_iphone.png</key>
+		<dict>
+			<key>frame</key>
+			<string>{{513.75,1081.875},{420,461.25}}</string>
+			<key>offset</key>
+			<string>{0,0}</string>
+			<key>rotated</key>
+			<false/>
+			<key>sourceColorRect</key>
+			<string>{{0,0},{420,461.25}}</string>
+			<key>sourceSize</key>
+			<string>{420,461.25}</string>
+		</dict>
+	</dict>
+	<key>metadata</key>
+	<dict>
+		<key>format</key>
+		<integer>2</integer>
+		<key>realTextureFileName</key>
+		<string>characters2-images.png</string>
+		<key>size</key>
+		<string>{960,1920}</string>
+		<key>smartupdate</key>
+		<string>$TexturePacker:SmartUpdate:200f742c2377c9f9b6cacdbf8f5465c0$</string>
+		<key>textureFileName</key>
+		<string>characters2-images.png</string>
+	</dict>
+</dict>
+</plist>
