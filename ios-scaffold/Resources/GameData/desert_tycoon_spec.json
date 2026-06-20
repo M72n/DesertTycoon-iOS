@@ -1,0 +1,90 @@
+{
+  "project_name": "سلطان الصحراء - نسخة iOS",
+  "source_video": {
+    "file": "PSseriesX - Desert Tycoon Android iOS HD Gameplay 2015.mp4",
+    "duration_seconds": 815.64,
+    "resolution": "910x512",
+    "fps": 30
+  },
+  "genre": ["mobile_tycoon", "idle_builder", "farming", "business_management"],
+  "camera": {
+    "style": "2.5D isometric/top-down",
+    "controls": ["tap", "pan_optional", "pinch_zoom_optional"]
+  },
+  "starting_state": {
+    "level": 1,
+    "coins": 1000,
+    "cash": 10,
+    "energy": 5,
+    "goods": 0,
+    "goodsCapacity": 25,
+    "populationCapacity": 1,
+    "availableWorkers": 1
+  },
+  "resources": [
+    {"id": "energy", "name": "الطاقة", "usage": "session/play/boost resource"},
+    {"id": "goods", "name": "البضائع", "usage": "supply businesses; produced by crops"},
+    {"id": "coins", "name": "العملات", "usage": "soft currency for buildings/crops"},
+    {"id": "cash", "name": "الدنانير", "usage": "premium currency"},
+    {"id": "workers", "name": "العمال", "usage": "required by businesses"},
+    {"id": "points", "name": "النقاط", "usage": "leveling"}
+  ],
+  "crops": [
+    {"id": "dates", "name": "تمر", "unlockLevel": 1, "coinCost": 10, "yieldGoods": 10, "growSeconds": 30},
+    {"id": "cucumbers", "name": "خيار", "unlockLevel": 3, "coinCost": 15, "yieldGoods": 20, "growSeconds": 60},
+    {"id": "okra", "name": "بامية", "unlockLevel": 4, "coinCost": 25, "yieldGoods": 35, "growSeconds": 300},
+    {"id": "tomatoes", "name": "طماطم", "unlockLevel": 7, "coinCost": 45, "yieldGoods": 70, "growSeconds": 600}
+  ],
+  "buildings": {
+    "housing": [
+      {"id": "small_tent", "name": "خيمة صغيرة", "unlockLevel": 1, "coinCost": 150, "populationBonus": 1},
+      {"id": "small_hut", "name": "كوخ صغير", "unlockLevel": 5, "coinCost": 290, "populationBonus": 2},
+      {"id": "large_hut", "name": "كوخ كبير", "unlockLevel": 7, "coinCost": 430, "populationBonus": 3}
+    ],
+    "farming": [
+      {"id": "farm_plot", "name": "أرض زراعة", "unlockLevel": 1, "coinCost": 100},
+      {"id": "small_silo", "name": "صومعة صغيرة", "unlockLevel": 1, "coinCost": 500, "goodsRequirementObserved": 375, "goodsCapacityBonus": 25},
+      {"id": "medium_silo", "name": "صومعة متوسطة", "unlockLevel": 3, "coinCostObserved": 1875, "goodsRequirementObserved": 1500}
+    ],
+    "business": [
+      {"id": "vegetable_kiosk", "name": "كشك خضار", "unlockLevel": 1, "coinCost": 100, "requiredWorkers": 1, "goodsRequired": 10, "workSeconds": 30, "rewardCoins": 15, "rewardPoints": 1},
+      {"id": "spice_kiosk", "name": "كشك بهارات", "unlockLevel": 3, "coinCost": 200, "requiredWorkers": 1, "goodsRequired": 20, "workSeconds": 60, "rewardCoins": 30, "rewardPoints": 2},
+      {"id": "butcher_shop", "name": "محل لحوم", "unlockLevel": 4, "coinCost": 500, "requiredWorkers": 1, "goodsRequired": 105, "workSeconds": 120, "rewardCoins": 153, "rewardPoints": 3},
+      {"id": "bakery", "name": "مخبز", "unlockLevel": 5, "coinCost": 300, "requiredWorkers": 1, "goodsRequired": 35, "workSeconds": 90, "rewardCoins": 55, "rewardPoints": 2},
+      {"id": "bisht_shop", "name": "محل بشوت", "unlockLevel": 6, "requiredWorkers": 2},
+      {"id": "falcon_shop", "name": "محل صقور", "unlockLevel": 7}
+    ],
+    "community": [
+      {"id": "water_well", "name": "بئر ماء", "unlockLevel": 1, "coinCost": 350, "housingLimitBonus": 5},
+      {"id": "road", "name": "طريق", "unlockLevel": 1, "coinCost": 10, "housingLimitBonus": 0},
+      {"id": "school", "name": "مدرسة", "unlockLevel": 6, "coinCost": 685, "housingLimitBonus": 10}
+    ],
+    "expansion": [
+      {"id": "coin_expansion", "name": "توسعة بالعملات", "coinCost": 5000},
+      {"id": "cash_expansion", "name": "توسعة بالدنانير", "cashCost": 5}
+    ]
+  },
+  "store_categories": ["New", "Video", "Housing", "Business", "Farming", "Community", "Expansion", "Energy", "Currency"],
+  "farm_plot_states": ["EMPTY", "GROWING", "READY"],
+  "business_states": ["NEEDS_WORKER", "NEEDS_GOODS", "DELIVERING", "READY_TO_COLLECT"],
+  "goals": [
+    {"id": "move_visitor_into_tent", "title": "مهمة السكن", "steps": [{"type": "assign_neighbor", "target": "starting_tent", "label": "انقل جارًا إلى الخيمة"}]},
+    {"id": "first_farm", "title": "مهمة الزراعة", "steps": [{"type": "build", "target": "farm_plot", "label": "ابنِ أرض زراعة"}, {"type": "harvest_crop", "target": "dates", "label": "ازرع واحصد التمر"}], "reward": {"coins": 25}},
+    {"id": "first_business", "title": "مهمة المحل", "steps": [{"type": "build", "target": "vegetable_kiosk", "label": "ابنِ كشك خضار"}, {"type": "collect_business", "target": "vegetable_kiosk", "label": "اجمع أرباح كشك الخضار"}], "reward": {"coins": 60}},
+    {"id": "okra_goal", "title": "مهمة الزراعة", "steps": [{"type": "harvest_crop", "target": "okra", "label": "ازرع واحصد البامية"}], "reward": {"coins": 5}},
+    {"id": "small_hut_goal", "title": "مهمة السكن", "steps": [{"type": "build", "target": "small_hut", "label": "ابنِ كوخًا صغيرًا"}, {"type": "visit", "target": "small_hut", "label": "زر الكوخ الصغير"}], "reward": {"coins": 75}},
+    {"id": "bakery_goal", "title": "مهمة المحل", "steps": [{"type": "build", "target": "bakery", "label": "ابنِ مخبزًا"}, {"type": "collect_business", "target": "bakery", "label": "اجمع أرباح المخبز"}], "reward": {"coins": 60}},
+    {"id": "school_goal", "title": "مهمة المجتمع", "steps": [{"type": "build", "target": "school", "label": "ابنِ مدرسة"}, {"type": "complete_construction", "target": "school", "label": "أكمل بناء المدرسة"}], "reward": {"coins": 205}}
+  ],
+  "ui_requirements": {
+    "hud": ["Goals button", "Menu button", "level badge", "energy bar", "goods bar", "coins", "cash", "workers", "red notification badges"],
+    "dialogs": ["dark overlay", "ornate gold/brown frame", "green action buttons", "tutorial guide character", "orange arrows"],
+    "placement": ["green valid footprint", "red invalid footprint", "confirm", "cancel", "rotate/refresh"]
+  },
+  "implementation_notes": [
+    "Use data-driven definitions for buildings, crops and goals.",
+    "Use timestamp-based timers so offline progress works.",
+    "Use mock IAP and mock rewarded ads in prototype.",
+    "Do not copy original copyrighted assets unless the user owns them."
+  ]
+}

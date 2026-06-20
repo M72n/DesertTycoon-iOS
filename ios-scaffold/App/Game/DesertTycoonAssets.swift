@@ -1,262 +1,280 @@
-import CoreGraphics
 import Foundation
 
-enum DesertTycoonPhase: CaseIterable {
-    case phaseOne
-    case phaseTwo
-    case phaseThree
+struct DTStartingState: Codable {
+    var level: Int
+    var coins: Int
+    var cash: Int
+    var energy: Int
+    var goods: Int
+    var goodsCapacity: Int
+    var populationCapacity: Int
+    var availableWorkers: Int
+}
 
-    var referenceBackdropPaths: [String] {
-        switch self {
-        case .phaseOne:
-            return [
-                "ReferenceBackdrops/apk_phase1_village_en.png"
-            ]
-        case .phaseTwo:
-            return [
-                "ReferenceBackdrops/apk_phase2_overview_en.png",
-                "ReferenceBackdrops/apk_phase2_close_en.png"
-            ]
-        case .phaseThree:
-            return [
-                "ReferenceBackdrops/apk_phase3_overview_ar.png",
-                "ReferenceBackdrops/apk_phase3_collect_en.png",
-                "ReferenceBackdrops/apk_final.png"
-            ]
-        }
-    }
+struct DTCropDefinition: Codable, Equatable {
+    var id: String
+    var name: String
+    var unlockLevel: Int
+    var coinCost: Int
+    var yieldGoods: Int
+    var growSeconds: TimeInterval
+}
 
-    var mapCandidates: [String] {
-        switch self {
-        case .phaseOne:
-            return [
-                "iphone-hd-upscaled/maps/DT_Phase1_iso_full.png",
-                "GeneratedMaps/DT_Phase1_iso_full.png",
-                "GeneratedMaps/DT_Phase1_ortho_full.png",
-                "preview_phase1_map.png",
-                "iphone-hd/maps/DT_Phase1_ortho.png"
-            ]
-        case .phaseTwo:
-            return [
-                "iphone-hd-upscaled/maps/DT_Phase2_iso_full.png",
-                "GeneratedMaps/DT_Phase2_iso_full.png",
-                "GeneratedMaps/DT_Phase2_ortho_full.png",
-                "preview_phase2_map.png",
-                "iphone-hd/maps/DT_Phase2_ortho.png"
-            ]
-        case .phaseThree:
-            return [
-                "iphone-hd-upscaled/maps/DT_Phase3_iso_full.png",
-                "GeneratedMaps/DT_Phase3_iso_full.png",
-                "GeneratedMaps/DT_Phase3_ortho_full.png",
-                "preview_phase3_map.png",
-                "iphone-hd/maps/DT_Phase3_ortho.png"
-            ]
-        }
-    }
+struct DTRawBuildingDefinition: Codable {
+    var id: String
+    var name: String
+    var unlockLevel: Int? = nil
+    var coinCost: Int? = nil
+    var coinCostObserved: Int? = nil
+    var cashCost: Int? = nil
+    var requiredWorkers: Int? = nil
+    var goodsRequired: Int? = nil
+    var workSeconds: TimeInterval? = nil
+    var rewardCoins: Int? = nil
+    var rewardPoints: Int? = nil
+    var populationBonus: Int? = nil
+    var goodsCapacityBonus: Int? = nil
+    var housingLimitBonus: Int? = nil
+}
 
-    var mapColumns: Int { 100 }
-    var mapRows: Int { 100 }
+struct DTBuildingCatalog: Codable {
+    var housing: [DTRawBuildingDefinition]
+    var farming: [DTRawBuildingDefinition]
+    var business: [DTRawBuildingDefinition]
+    var community: [DTRawBuildingDefinition]
+    var expansion: [DTRawBuildingDefinition]
+}
 
-    var tileSize: CGSize {
-        switch self {
-        case .phaseOne:
-            return CGSize(width: 64, height: 32)
-        case .phaseTwo, .phaseThree:
-            return CGSize(width: 32, height: 16)
-        }
+struct DTReward: Codable, Equatable {
+    var coins: Int? = nil
+    var cash: Int? = nil
+    var energy: Int? = nil
+    var goods: Int? = nil
+    var points: Int? = nil
+}
+
+struct DTGoalStepDefinition: Codable, Equatable {
+    var type: String
+    var target: String
+    var label: String?
+
+    var eventKey: String {
+        "\(type):\(target)"
     }
 }
 
-enum DesertTycoonResource: String, CaseIterable {
-    case coins
-    case dinars
-    case energy
-    case goods
-    case oil
-    case population
+struct DTGoalDefinition: Codable, Equatable {
+    var id: String
+    var title: String
+    var steps: [DTGoalStepDefinition]
+    var reward: DTReward?
+}
 
-    var iconFrame: String {
-        switch self {
-        case .coins:
-            return "main_screen_ui/bottom_bar/coins_symbol.png"
-        case .dinars:
-            return "main_screen_ui/bottom_bar/dinars_symbol.png"
-        case .energy:
-            return "main_screen_ui/bottom_bar/energy_symbol.png"
-        case .goods:
-            return "main_screen_ui/bottom_bar/goods_symbol.png"
-        case .oil:
-            return "main_screen_ui/bottom_bar/oil_symbol.png"
-        case .population:
-            return "souk_screen/icon_population.png"
-        }
+struct DTSpec: Codable {
+    var startingState: DTStartingState
+    var crops: [DTCropDefinition]
+    var buildings: DTBuildingCatalog
+    var storeCategories: [String]
+    var goals: [DTGoalDefinition]
+
+    enum CodingKeys: String, CodingKey {
+        case startingState = "starting_state"
+        case crops
+        case buildings
+        case storeCategories = "store_categories"
+        case goals
     }
 }
 
-struct DesertTycoonResources {
-    var coins = 1200
-    var dinars = 25
-    var energy = 20
-    var goods = 0
-    var oil = 0
-    var population = 0
-
-    func value(for resource: DesertTycoonResource) -> Int {
-        switch resource {
-        case .coins:
-            return coins
-        case .dinars:
-            return dinars
-        case .energy:
-            return energy
-        case .goods:
-            return goods
-        case .oil:
-            return oil
-        case .population:
-            return population
-        }
+struct DTStoreItem: Equatable {
+    enum Kind: String, Codable, Equatable {
+        case building
+        case crop
+        case mock
     }
 
-    mutating func add(_ amount: Int, to resource: DesertTycoonResource) {
-        switch resource {
-        case .coins:
-            coins += amount
-        case .dinars:
-            dinars += amount
-        case .energy:
-            energy += amount
-        case .goods:
-            goods += amount
-        case .oil:
-            oil += amount
-        case .population:
-            population += amount
-        }
+    var id: String
+    var name: String
+    var category: String
+    var kind: Kind
+    var unlockLevel: Int
+    var coinCost: Int
+    var cashCost: Int
+    var requiredWorkers: Int
+    var goodsRequired: Int
+    var workSeconds: TimeInterval
+    var rewardCoins: Int
+    var rewardPoints: Int
+    var populationBonus: Int
+    var goodsCapacityBonus: Int
+    var housingLimitBonus: Int
+
+    init(raw: DTRawBuildingDefinition, category: String) {
+        id = raw.id
+        name = raw.name
+        self.category = category
+        kind = .building
+        unlockLevel = raw.unlockLevel ?? 1
+        coinCost = raw.coinCost ?? raw.coinCostObserved ?? 0
+        cashCost = raw.cashCost ?? 0
+        requiredWorkers = raw.requiredWorkers ?? 0
+        goodsRequired = raw.goodsRequired ?? 0
+        workSeconds = raw.workSeconds ?? 0
+        rewardCoins = raw.rewardCoins ?? 0
+        rewardPoints = raw.rewardPoints ?? 0
+        populationBonus = raw.populationBonus ?? 0
+        goodsCapacityBonus = raw.goodsCapacityBonus ?? 0
+        housingLimitBonus = raw.housingLimitBonus ?? 0
     }
 
-    mutating func spendCoins(_ amount: Int) -> Bool {
-        guard coins >= amount else { return false }
-        coins -= amount
-        return true
+    init(crop: DTCropDefinition) {
+        id = crop.id
+        name = crop.name
+        category = "Farming"
+        kind = .crop
+        unlockLevel = crop.unlockLevel
+        coinCost = crop.coinCost
+        cashCost = 0
+        requiredWorkers = 0
+        goodsRequired = 0
+        workSeconds = crop.growSeconds
+        rewardCoins = 0
+        rewardPoints = max(1, crop.yieldGoods / 10)
+        populationBonus = 0
+        goodsCapacityBonus = 0
+        housingLimitBonus = 0
+    }
+
+    init(id: String, name: String, category: String, cashCost: Int = 0, coinCost: Int = 0) {
+        self.id = id
+        self.name = name
+        self.category = category
+        kind = .mock
+        unlockLevel = 1
+        self.coinCost = coinCost
+        self.cashCost = cashCost
+        requiredWorkers = 0
+        goodsRequired = 0
+        workSeconds = 0
+        rewardCoins = 0
+        rewardPoints = 0
+        populationBonus = 0
+        goodsCapacityBonus = 0
+        housingLimitBonus = 0
+    }
+
+    var isLocked(at level: Int) -> Bool {
+        level < unlockLevel
     }
 }
 
-enum DesertTycoonBuildType: String, CaseIterable {
-    case residential
-    case business
-    case community
-    case farm
-    case energy
-    case oil
+struct DesertTycoonGameData {
+    let spec: DTSpec
+    let buildingItems: [DTStoreItem]
+    let storeItems: [DTStoreItem]
+    let levelThresholds = [0, 20, 60, 130, 250, 420, 650, 950]
 
-    var iconFrame: String {
-        switch self {
-        case .residential:
-            return "souk_screen/icons/ResidentialIcon.png"
-        case .business:
-            return "souk_screen/icons/BusinessIcon.png"
-        case .community:
-            return "souk_screen/icons/CommunityIcon.png"
-        case .farm:
-            return "souk_screen/icons/FarmIcon.png"
-        case .energy:
-            return "souk_screen/icons/EnergyIcon.png"
-        case .oil:
-            return "souk_screen/icons/OilIcon.png"
+    static func load() -> DesertTycoonGameData {
+        if let url = BundleAssetResolver.url(candidates: ["GameData/desert_tycoon_spec.json"]),
+           let data = try? Data(contentsOf: url),
+           let spec = try? JSONDecoder().decode(DTSpec.self, from: data) {
+            return DesertTycoonGameData(spec: spec)
         }
+
+        return DesertTycoonGameData(spec: .fallback)
     }
 
-    var cost: Int {
-        switch self {
-        case .residential:
-            return 80
-        case .business:
-            return 120
-        case .community:
-            return 100
-        case .farm:
-            return 70
-        case .energy:
-            return 90
-        case .oil:
-            return 180
-        }
+    init(spec: DTSpec) {
+        self.spec = spec
+
+        var buildings: [DTStoreItem] = []
+        buildings += spec.buildings.housing.map { DTStoreItem(raw: $0, category: "Housing") }
+        buildings += spec.buildings.business.map { DTStoreItem(raw: $0, category: "Business") }
+        buildings += spec.buildings.farming.map { DTStoreItem(raw: $0, category: "Farming") }
+        buildings += spec.buildings.community.map { DTStoreItem(raw: $0, category: "Community") }
+        buildings += spec.buildings.expansion.map { DTStoreItem(raw: $0, category: "Expansion") }
+        buildingItems = buildings
+
+        let mockItems = [
+            DTStoreItem(id: "reward_video", name: "شاهد فيديو", category: "Video"),
+            DTStoreItem(id: "energy_5", name: "+5 طاقة", category: "Energy", cashCost: 8),
+            DTStoreItem(id: "energy_10", name: "+10 طاقة", category: "Energy", cashCost: 15),
+            DTStoreItem(id: "coins_5000", name: "5000 عملات", category: "Currency", cashCost: 10),
+            DTStoreItem(id: "dinars_10", name: "10 دنانير", category: "Currency")
+        ]
+        storeItems = buildings + mockItems
     }
 
-    var productionResource: DesertTycoonResource {
-        switch self {
-        case .residential:
-            return .population
-        case .business, .community:
-            return .coins
-        case .farm:
-            return .goods
-        case .energy:
-            return .energy
-        case .oil:
-            return .oil
-        }
+    func item(id: String) -> DTStoreItem? {
+        storeItems.first { $0.id == id }
     }
 
-    var productionAmount: Int {
-        switch self {
-        case .residential:
-            return 2
-        case .business:
-            return 35
-        case .community:
-            return 20
-        case .farm:
-            return 12
-        case .energy:
-            return 8
-        case .oil:
-            return 6
-        }
+    func crop(id: String) -> DTCropDefinition? {
+        spec.crops.first { $0.id == id }
     }
 
-    var buildDuration: TimeInterval {
-        switch self {
-        case .oil:
-            return 5.0
-        default:
-            return 3.0
+    func items(in category: String, level: Int) -> [DTStoreItem] {
+        if category == "New" {
+            return storeItems
+                .filter { $0.unlockLevel <= level && $0.unlockLevel >= max(1, level - 1) }
+                .sorted { $0.unlockLevel < $1.unlockLevel }
         }
+
+        return storeItems.filter { $0.category == category }
     }
 
-    var productionInterval: TimeInterval {
-        switch self {
-        case .residential:
-            return 12.0
-        case .business:
-            return 9.0
-        case .community:
-            return 11.0
-        case .farm:
-            return 7.0
-        case .energy:
-            return 10.0
-        case .oil:
-            return 13.0
+    func level(for points: Int) -> Int {
+        var level = 1
+        for (index, threshold) in levelThresholds.enumerated() where points >= threshold {
+            level = max(1, index + 1)
         }
+        return level
     }
+}
 
-    var bubbleFrame: String {
-        switch productionResource {
-        case .coins:
-            return "status_baloons/Coin_Bubble.png"
-        case .energy:
-            return "status_baloons/green_light_bubble.png"
-        case .goods:
-            return "status_baloons/Goods_Bubble.png"
-        case .oil:
-            return "status_baloons/oil_bubble.png"
-        case .population:
-            return "status_baloons/House_Visit_Bubble.png"
-        case .dinars:
-            return "status_baloons/Coin_Bubble.png"
-        }
-    }
+extension DTSpec {
+    static let fallback = DTSpec(
+        startingState: DTStartingState(
+            level: 1,
+            coins: 1000,
+            cash: 10,
+            energy: 5,
+            goods: 0,
+            goodsCapacity: 25,
+            populationCapacity: 1,
+            availableWorkers: 1
+        ),
+        crops: [
+            DTCropDefinition(id: "dates", name: "تمر", unlockLevel: 1, coinCost: 10, yieldGoods: 10, growSeconds: 30),
+            DTCropDefinition(id: "cucumbers", name: "خيار", unlockLevel: 3, coinCost: 15, yieldGoods: 20, growSeconds: 60),
+            DTCropDefinition(id: "okra", name: "بامية", unlockLevel: 4, coinCost: 25, yieldGoods: 35, growSeconds: 300),
+            DTCropDefinition(id: "tomatoes", name: "طماطم", unlockLevel: 7, coinCost: 45, yieldGoods: 70, growSeconds: 600)
+        ],
+        buildings: DTBuildingCatalog(
+            housing: [
+                DTRawBuildingDefinition(id: "small_tent", name: "خيمة صغيرة", unlockLevel: 1, coinCost: 150, populationBonus: 1),
+                DTRawBuildingDefinition(id: "small_hut", name: "كوخ صغير", unlockLevel: 5, coinCost: 290, populationBonus: 2)
+            ],
+            farming: [
+                DTRawBuildingDefinition(id: "farm_plot", name: "أرض زراعة", unlockLevel: 1, coinCost: 100),
+                DTRawBuildingDefinition(id: "small_silo", name: "صومعة صغيرة", unlockLevel: 1, coinCost: 500, goodsCapacityBonus: 25)
+            ],
+            business: [
+                DTRawBuildingDefinition(id: "vegetable_kiosk", name: "كشك خضار", unlockLevel: 1, coinCost: 100, requiredWorkers: 1, goodsRequired: 10, workSeconds: 30, rewardCoins: 15, rewardPoints: 1),
+                DTRawBuildingDefinition(id: "bakery", name: "مخبز", unlockLevel: 5, coinCost: 300, requiredWorkers: 1, goodsRequired: 35, workSeconds: 90, rewardCoins: 55, rewardPoints: 2)
+            ],
+            community: [
+                DTRawBuildingDefinition(id: "water_well", name: "بئر ماء", unlockLevel: 1, coinCost: 350, housingLimitBonus: 5),
+                DTRawBuildingDefinition(id: "road", name: "طريق", unlockLevel: 1, coinCost: 10)
+            ],
+            expansion: [
+                DTRawBuildingDefinition(id: "coin_expansion", name: "توسعة بالعملات", unlockLevel: 1, coinCost: 5000)
+            ]
+        ),
+        storeCategories: ["New", "Video", "Housing", "Business", "Farming", "Community", "Expansion", "Energy", "Currency"],
+        goals: [
+            DTGoalDefinition(id: "move_visitor_into_tent", title: "مهمة السكن", steps: [DTGoalStepDefinition(type: "assign_neighbor", target: "starting_tent", label: "انقل جارًا إلى الخيمة")], reward: DTReward(coins: 0, cash: nil, energy: nil, goods: nil, points: nil)),
+            DTGoalDefinition(id: "first_farm", title: "مهمة الزراعة", steps: [DTGoalStepDefinition(type: "build", target: "farm_plot", label: "ابنِ أرض زراعة"), DTGoalStepDefinition(type: "harvest_crop", target: "dates", label: "ازرع واحصد التمر")], reward: DTReward(coins: 25, cash: nil, energy: nil, goods: nil, points: nil))
+        ]
+    )
 }
