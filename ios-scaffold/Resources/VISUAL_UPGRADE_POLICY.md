@@ -29,4 +29,8 @@ The iOS app should resolve assets in this order:
 2. `LegacyAssets/iphone-hd` or app-bundle root `iphone-hd`
 3. top-level preview assets in `Resources`
 
+An upscaled sprite atlas is used only if its PNG retains an alpha channel. Some existing
+1920 × 1920 exports are opaque RGB with a white background; those are skipped in
+favor of the original transparent RGBA atlas so icons render without white boxes.
+
 This keeps the visual upgrade reversible and protects the original game presentation while the iOS port is rebuilt.
