@@ -1,6 +1,20 @@
 import SpriteKit
 import UIKit
 
+// UI colors are deliberately sampled from the game's original desert artwork.
+// Gameplay assets stay untouched; these colors only dress the interface.
+private enum DTStyle {
+    static let ink = UIColor(red: 0.12, green: 0.18, blue: 0.18, alpha: 1)
+    static let deepGreen = UIColor(red: 0.08, green: 0.29, blue: 0.25, alpha: 1)
+    static let green = UIColor(red: 0.13, green: 0.42, blue: 0.32, alpha: 1)
+    static let gold = UIColor(red: 0.86, green: 0.67, blue: 0.34, alpha: 1)
+    static let lightGold = UIColor(red: 0.97, green: 0.85, blue: 0.58, alpha: 1)
+    static let parchment = UIColor(red: 0.98, green: 0.93, blue: 0.79, alpha: 1)
+    static let sand = UIColor(red: 0.88, green: 0.78, blue: 0.60, alpha: 1)
+    static let brown = UIColor(red: 0.34, green: 0.21, blue: 0.14, alpha: 1)
+    static let white = UIColor(red: 1, green: 0.98, blue: 0.92, alpha: 1)
+}
+
 private struct DTPlacedBuilding: Codable {
     var id: String
     var definitionID: String
@@ -151,9 +165,23 @@ final class DesertTycoonScene: SKScene {
         }
 
         clampCamera()
+        alignScreenLayers()
         layoutHUD()
         layoutOverlay()
         layoutPlacementControls()
+    }
+
+    // A camera zoom must never shrink the tappable HUD or move it away from the
+    // physical screen edges. Camera children use the inverse camera transform.
+    private func alignScreenLayers() {
+        let scale = cameraNode.xScale
+        hudNode.setScale(scale)
+        overlayNode.setScale(scale)
+        placementNode.setScale(scale)
+    }
+
+    private var safeInsets: UIEdgeInsets {
+        view?.safeAreaInsets ?? .zero
     }
 
     private func setUpScene() {
@@ -579,110 +607,163 @@ final class DesertTycoonScene: SKScene {
 
     private func layoutHUD() {
         hudNode.removeAllChildren()
+        let bottomY = -size.height / 2 + safeInsets.bottom + 47
+        let usableWidth = size.width - safeInsets.left - safeInsets.right
+        let barWidth = min(usableWidth - 174, 690)
+        let bar = SKShapeNode(rectOf: CGSize(width: barWidth, height: 78), cornerRadius: 19)
+        bar.fillColor = DTStyle.deepGreen.withAlphaComponent(0.94)
+        bar.strokeColor = DTStyle.gold
+        bar.lineWidth = 2
+        bar.position = CGPoint(x: 0, y: bottomY)
+        bar.zPosition = 900
+        hudNode.addChild(bar)
 
-        if let texture = gameAtlas?.texture(named: "main_screen_ui/bottom_bar/bottom_bar.png") {
-            let bar = SKSpriteNode(texture: texture)
-            bar.size = CGSize(width: max(460, size.width - 180), height: 88)
-            bar.position = CGPoint(x: 0, y: -size.height / 2 + 42)
-            bar.alpha = 0.98
-            bar.zPosition = 900
-            hudNode.addChild(bar)
+        let inset = SKShapeNode(rectOf: CGSize(width: barWidth - 10, height: 68), cornerRadius: 15)
+        inset.fillColor = UIColor(red: 0.14, green: 0.32, blue: 0.29, alpha: 0.76)
+        inset.strokeColor = DTStyle.lightGold.withAlphaComponent(0.26)
+        inset.lineWidth = 1
+        inset.position = bar.position
+        inset.zPosition = 901
+        hudNode.addChild(inset)
+
+        addHUDButton(frame: "main_screen_ui/goals_menu/goals_button.png", text: "المهام", action: "hud:goals", x: -size.width / 2 + safeInsets.left + 52, y: bottomY)
+        let remainingGoals = max(0, data.spec.goals.count - state.activeGoalIndex)
+        if remainingGoals > 0 {
+            addBadge(text: "\(remainingGoals)", at: CGPoint(x: -size.width / 2 + safeInsets.left + 85, y: bottomY + 29), to: hudNode)
         }
+        addHUDButton(frame: "main_screen_ui/right_menu/menu_button.png", text: "السوق", action: "hud:menu", x: size.width / 2 - safeInsets.right - 52, y: bottomY)
 
-        let goals = sprite(from: gameAtlas, frameName: "main_screen_ui/goals_menu/goals_button.png", fallbackSize: CGSize(width: 90, height: 74))
-        goals.position = CGPoint(x: -size.width / 2 + 58, y: -size.height / 2 + 48)
-        goals.size = CGSize(width: 94, height: 74)
-        goals.zPosition = 1000
-        goals.name = "hud:goals"
-        hudNode.addChild(goals)
-        addBadge(text: "\(max(0, data.spec.goals.count - state.activeGoalIndex))", at: CGPoint(x: -size.width / 2 + 90, y: -size.height / 2 + 82), to: hudNode)
+        let cellWidth = min(145, (barWidth - 28) / 4 - 5)
+        let cellStep = (barWidth - 28) / 4
+        let firstX = -cellStep * 1.5
+        resourceGroup(icon: "main_screen_ui/bottom_bar/energy_symbol.png", title: "الطاقة", text: "\(state.energy)", x: firstX, y: bottomY, width: cellWidth)
+        resourceGroup(icon: "main_screen_ui/bottom_bar/goods_symbol.png", title: "البضائع", text: "\(state.goods)/\(state.goodsCapacity)", x: firstX + cellStep, y: bottomY, width: cellWidth, progress: state.goodsCapacity > 0 ? CGFloat(state.goods) / CGFloat(state.goodsCapacity) : 0)
+        resourceGroup(icon: "main_screen_ui/bottom_bar/coins_symbol.png", title: "العملات", text: "\(state.coins)", x: firstX + cellStep * 2, y: bottomY, width: cellWidth)
+        resourceGroup(icon: "main_screen_ui/bottom_bar/dinars_symbol.png", title: "الدنانير", text: "\(state.cash)", x: firstX + cellStep * 3, y: bottomY, width: cellWidth)
 
-        let menu = sprite(from: gameAtlas, frameName: "main_screen_ui/right_menu/menu_button.png", fallbackSize: CGSize(width: 90, height: 74))
-        menu.position = CGPoint(x: size.width / 2 - 58, y: -size.height / 2 + 48)
-        menu.size = CGSize(width: 94, height: 74)
-        menu.zPosition = 1000
-        menu.name = "hud:menu"
-        hudNode.addChild(menu)
-
-        let levelBadge = SKShapeNode(circleOfRadius: 28)
-        levelBadge.fillColor = UIColor(red: 0.20, green: 0.30, blue: 0.34, alpha: 1)
-        levelBadge.strokeColor = UIColor(red: 0.71, green: 0.84, blue: 0.27, alpha: 1)
-        levelBadge.lineWidth = 5
-        levelBadge.position = CGPoint(x: -size.width / 2 + 158, y: -size.height / 2 + 74)
-        levelBadge.zPosition = 1000
-        hudNode.addChild(levelBadge)
-        let levelText = label("\(state.level)", size: 23, color: .white, alignment: .center)
-        levelText.position = levelBadge.position.applying(CGAffineTransform(translationX: 0, y: -8))
-        levelText.zPosition = 1001
-        hudNode.addChild(levelText)
-
-        let y = -size.height / 2 + 48
-        resourceGroup(icon: "main_screen_ui/bottom_bar/energy_symbol.png", text: "\(state.energy)", x: -size.width / 2 + 248, y: y, width: 86)
-        resourceGroup(icon: "main_screen_ui/bottom_bar/goods_symbol.png", text: "\(state.goods)/\(state.goodsCapacity)", x: -size.width / 2 + 368, y: y, width: 118)
-        resourceGroup(icon: "main_screen_ui/bottom_bar/coins_symbol.png", text: "\(state.coins)", x: size.width / 2 - 310, y: y, width: 130)
-        resourceGroup(icon: "main_screen_ui/bottom_bar/dinars_symbol.png", text: "\(state.cash)", x: size.width / 2 - 168, y: y, width: 108)
-        resourceGroup(icon: "souk_screen/icon_population.png", text: "\(max(0, state.availableWorkers - state.assignedWorkers))", x: size.width / 2 - 260, y: y + 66, width: 104, atlas: soukAtlas)
-
+        addLevelMedallion()
+        resourceGroup(icon: "souk_screen/icon_population.png", title: "العمال", text: "\(max(0, state.availableWorkers - state.assignedWorkers))", x: size.width / 2 - safeInsets.right - 88, y: size.height / 2 - safeInsets.top - 45, width: 148, atlas: soukAtlas)
         addTutorialBanner()
         addTutorialControls()
-        addDebugTouchTargets()
     }
 
-    private func resourceGroup(icon: String, text: String, x: CGFloat, y: CGFloat, width: CGFloat, atlas: CocosTextureAtlas? = nil) {
-        let panel = SKShapeNode(rectOf: CGSize(width: width, height: 38), cornerRadius: 6)
-        panel.fillColor = UIColor(red: 0.18, green: 0.10, blue: 0.07, alpha: 0.78)
-        panel.strokeColor = UIColor(red: 0.76, green: 0.57, blue: 0.31, alpha: 1)
-        panel.lineWidth = 2
+    private func addHUDButton(frame: String, text: String, action: String, x: CGFloat, y: CGFloat) {
+        let icon = sprite(from: gameAtlas, frameName: frame, fallbackSize: CGSize(width: 90, height: 78))
+        icon.size = CGSize(width: 92, height: 80)
+        icon.position = CGPoint(x: x, y: y)
+        icon.zPosition = 1000
+        icon.name = action
+        hudNode.addChild(icon)
+        let caption = label(text, size: 17, color: DTStyle.white, alignment: .center)
+        caption.position = CGPoint(x: x, y: y - 8)
+        caption.zPosition = 1001
+        caption.name = action
+        hudNode.addChild(caption)
+    }
+
+    private func addLevelMedallion() {
+        let x = -size.width / 2 + safeInsets.left + 63
+        let y = size.height / 2 - safeInsets.top - 46
+        let medallion = SKShapeNode(circleOfRadius: 31)
+        medallion.fillColor = DTStyle.deepGreen
+        medallion.strokeColor = DTStyle.lightGold
+        medallion.lineWidth = 3
+        medallion.position = CGPoint(x: x, y: y)
+        medallion.zPosition = 1000
+        hudNode.addChild(medallion)
+        let title = label("مستوى", size: 11, color: DTStyle.lightGold, alignment: .center)
+        title.position = CGPoint(x: x, y: y + 12)
+        title.zPosition = 1001
+        hudNode.addChild(title)
+        let number = label("\(state.level)", size: 25, color: DTStyle.white, alignment: .center)
+        number.position = CGPoint(x: x, y: y - 11)
+        number.zPosition = 1001
+        hudNode.addChild(number)
+    }
+
+    private func resourceGroup(icon: String, title: String, text: String, x: CGFloat, y: CGFloat, width: CGFloat, atlas: CocosTextureAtlas? = nil, progress: CGFloat? = nil) {
+        let panel = SKShapeNode(rectOf: CGSize(width: width, height: 55), cornerRadius: 10)
+        panel.fillColor = DTStyle.ink.withAlphaComponent(0.92)
+        panel.strokeColor = DTStyle.gold.withAlphaComponent(0.54)
+        panel.lineWidth = 1
         panel.position = CGPoint(x: x, y: y)
         panel.zPosition = 1000
+        panel.name = "hud:menu"
         hudNode.addChild(panel)
 
-        let iconSprite = sprite(from: atlas ?? gameAtlas, frameName: icon, fallbackSize: CGSize(width: 28, height: 28))
-        iconSprite.size = CGSize(width: 30, height: 30)
-        iconSprite.position = CGPoint(x: x - width / 2 + 21, y: y + 1)
+        let iconSprite = sprite(from: atlas ?? gameAtlas, frameName: icon, fallbackSize: CGSize(width: 27, height: 29))
+        iconSprite.size = CGSize(width: 28, height: 29)
+        iconSprite.position = CGPoint(x: x - width / 2 + 20, y: y)
         iconSprite.zPosition = 1001
+        iconSprite.name = "hud:menu"
         hudNode.addChild(iconSprite)
 
-        let value = label(text, size: 19, color: .white, alignment: .right)
-        value.position = CGPoint(x: x + width / 2 - 14, y: y - 7)
+        let contentX = x - width / 2 + 39
+        let subtitle = label(title, size: 10, color: DTStyle.lightGold, alignment: .left)
+        subtitle.position = CGPoint(x: contentX, y: y + 11)
+        subtitle.zPosition = 1001
+        subtitle.name = "hud:menu"
+        hudNode.addChild(subtitle)
+        let value = label(text, size: text.count > 6 ? 15 : 18, color: DTStyle.white, alignment: .left)
+        value.position = CGPoint(x: contentX, y: y - 9)
         value.zPosition = 1001
+        value.name = "hud:menu"
         hudNode.addChild(value)
 
-        let plus = label("+", size: 30, color: UIColor(red: 0.45, green: 0.94, blue: 0.20, alpha: 1), alignment: .center)
-        plus.position = CGPoint(x: x + width / 2 + 18, y: y - 12)
-        plus.name = "hud:menu"
-        plus.zPosition = 1001
-        hudNode.addChild(plus)
+        if let progress {
+            let width = max(0, min(1, progress)) * (panel.frame.width - 16)
+            let track = SKShapeNode(rectOf: CGSize(width: panel.frame.width - 16, height: 3), cornerRadius: 1.5)
+            track.fillColor = DTStyle.sand.withAlphaComponent(0.25)
+            track.strokeColor = .clear
+            track.position = CGPoint(x: x, y: y - 23)
+            track.zPosition = 1001
+            hudNode.addChild(track)
+            if width > 0 {
+                let fill = SKShapeNode(rectOf: CGSize(width: width, height: 3), cornerRadius: 1.5)
+                fill.fillColor = DTStyle.lightGold
+                fill.strokeColor = .clear
+                fill.position = CGPoint(x: x - (panel.frame.width - 16 - width) / 2, y: y - 23)
+                fill.zPosition = 1002
+                hudNode.addChild(fill)
+            }
+        }
     }
 
     private func addTutorialBanner() {
-        guard !tutorialText.isEmpty else { return }
-        let bannerWidth = min(size.width - 190, 650)
-        let banner = SKShapeNode(rectOf: CGSize(width: bannerWidth, height: 54), cornerRadius: 8)
-        banner.fillColor = UIColor(red: 0.17, green: 0.10, blue: 0.07, alpha: 0.88)
-        banner.strokeColor = UIColor(red: 0.82, green: 0.65, blue: 0.40, alpha: 1)
-        banner.lineWidth = 2
-        banner.position = CGPoint(x: 18, y: size.height / 2 - 42)
+        guard !tutorialText.isEmpty, activePlacement == nil else { return }
+        let bannerWidth = max(260, min(size.width - safeInsets.left - safeInsets.right - 200, 560))
+        let banner = SKShapeNode(rectOf: CGSize(width: bannerWidth, height: 57), cornerRadius: 15)
+        banner.fillColor = DTStyle.deepGreen.withAlphaComponent(0.95)
+        banner.strokeColor = DTStyle.gold
+        banner.lineWidth = 1.5
+        banner.position = CGPoint(x: 0, y: size.height / 2 - safeInsets.top - 113)
         banner.zPosition = 1000
         hudNode.addChild(banner)
 
-        let text = label(tutorialText, size: 15, color: .white, alignment: .center)
-        text.position = CGPoint(x: banner.position.x, y: banner.position.y - 7)
-        text.preferredMaxLayoutWidth = bannerWidth - 32
+        let text = label(tutorialText, size: 14, color: DTStyle.white, alignment: .center)
+        text.position = banner.position
+        text.preferredMaxLayoutWidth = bannerWidth - 24
         text.numberOfLines = 2
         text.zPosition = 1001
         hudNode.addChild(text)
     }
 
     private func addTutorialControls() {
-        guard !tutorialText.isEmpty else { return }
+        guard !tutorialText.isEmpty, activePlacement == nil else { return }
 
-        let skip = sprite(from: gameAtlas, frameName: "tutorial/skip_tutorial_button.png", fallbackSize: CGSize(width: 74, height: 44))
-        skip.position = CGPoint(x: -size.width / 2 + 56, y: size.height / 2 - 34)
-        skip.size = CGSize(width: 74, height: 44)
+        let skip = SKShapeNode(rectOf: CGSize(width: 72, height: 31), cornerRadius: 10)
+        skip.fillColor = DTStyle.ink.withAlphaComponent(0.9)
+        skip.strokeColor = DTStyle.gold
+        skip.lineWidth = 1
+        skip.position = CGPoint(x: -size.width / 2 + safeInsets.left + 58, y: size.height / 2 - safeInsets.top - 113)
         skip.name = "tutorial:skip"
         skip.zPosition = 1100
         hudNode.addChild(skip)
+        let skipText = label("تخطي", size: 14, color: DTStyle.white, alignment: .center)
+        skipText.position = skip.position
+        skipText.name = "tutorial:skip"
+        skipText.zPosition = 1101
+        hudNode.addChild(skipText)
 
         let cue: (position: CGPoint, rotation: CGFloat)?
         if !state.completedEvents.contains("assign_neighbor:starting_tent") {
@@ -713,32 +794,17 @@ final class DesertTycoonScene: SKScene {
         ])))
     }
 
-    private func addDebugTouchTargets() {
-        addInvisibleHUDZone(name: "debug:coins", rect: CGRect(x: size.width / 2 - 96, y: size.height / 2 - 78, width: 40, height: 40))
-        addInvisibleHUDZone(name: "debug:speed", rect: CGRect(x: size.width / 2 - 52, y: size.height / 2 - 78, width: 40, height: 40))
-        addInvisibleHUDZone(name: "debug:reset", rect: CGRect(x: size.width / 2 - 8, y: size.height / 2 - 78, width: 40, height: 40))
-    }
-
-    private func addInvisibleHUDZone(name: String, rect: CGRect) {
-        let node = SKShapeNode(rect: rect)
-        node.fillColor = UIColor(white: 1, alpha: 0.01)
-        node.strokeColor = .clear
-        node.name = name
-        node.zPosition = 1100
-        hudNode.addChild(node)
-    }
-
     private func addBadge(text: String, at position: CGPoint, to node: SKNode) {
-        let badge = SKShapeNode(circleOfRadius: 18)
-        badge.fillColor = UIColor(red: 0.88, green: 0.12, blue: 0.05, alpha: 1)
-        badge.strokeColor = .white
+        let badge = SKShapeNode(circleOfRadius: 14)
+        badge.fillColor = UIColor(red: 0.68, green: 0.22, blue: 0.14, alpha: 1)
+        badge.strokeColor = DTStyle.lightGold
         badge.lineWidth = 2
         badge.position = position
         badge.zPosition = 1100
         node.addChild(badge)
 
-        let value = label(text, size: 18, color: .white, alignment: .center)
-        value.position = CGPoint(x: position.x, y: position.y - 7)
+        let value = label(text, size: 15, color: DTStyle.white, alignment: .center)
+        value.position = position
         value.zPosition = 1101
         node.addChild(value)
     }
@@ -767,30 +833,30 @@ final class DesertTycoonScene: SKScene {
         panel.position = .zero
         overlayNode.addChild(panel)
 
-        var y: CGFloat = 68
+        var y: CGFloat = 64
         for row in rows {
-            let task = SKShapeNode(rectOf: CGSize(width: 330, height: 48), cornerRadius: 6)
-            task.fillColor = UIColor(red: 0.93, green: 0.82, blue: 0.58, alpha: 1)
-            task.strokeColor = UIColor(red: 0.58, green: 0.32, blue: 0.18, alpha: 1)
-            task.lineWidth = 2
-            task.position = CGPoint(x: -28, y: y)
+            let task = SKShapeNode(rectOf: CGSize(width: 350, height: 62), cornerRadius: 10)
+            task.fillColor = DTStyle.parchment
+            task.strokeColor = DTStyle.gold
+            task.lineWidth = 1.5
+            task.position = CGPoint(x: -27, y: y)
             panel.addChild(task)
 
-            let taskLabel = label(row.0, size: 15, color: UIColor(red: 0.32, green: 0.18, blue: 0.10, alpha: 1), alignment: .center)
-            taskLabel.position = CGPoint(x: -28, y: y - 6)
-            taskLabel.preferredMaxLayoutWidth = 300
+            let taskLabel = label(row.0, size: 15, color: DTStyle.brown, alignment: .center)
+            taskLabel.position = CGPoint(x: -78, y: y)
+            taskLabel.preferredMaxLayoutWidth = 235
             taskLabel.numberOfLines = 2
             panel.addChild(taskLabel)
 
-            let status = label(row.1 ? "مكتملة" : "غير مكتملة", size: 14, color: .white, alignment: .center)
-            let statusBg = SKShapeNode(rectOf: CGSize(width: 128, height: 28), cornerRadius: 3)
-            statusBg.fillColor = row.1 ? UIColor(red: 0.18, green: 0.55, blue: 0.20, alpha: 1) : UIColor(red: 0.74, green: 0.10, blue: 0.10, alpha: 1)
+            let status = label(row.1 ? "مكتملة" : "جارية", size: 12, color: DTStyle.white, alignment: .center)
+            let statusBg = SKShapeNode(rectOf: CGSize(width: 80, height: 27), cornerRadius: 8)
+            statusBg.fillColor = row.1 ? DTStyle.green : DTStyle.brown
             statusBg.strokeColor = .clear
-            statusBg.position = CGPoint(x: -28, y: y - 36)
+            statusBg.position = CGPoint(x: 100, y: y)
             panel.addChild(statusBg)
-            status.position = CGPoint(x: -28, y: y - 43)
+            status.position = statusBg.position
             panel.addChild(status)
-            y -= 88
+            y -= 74
         }
 
         let guide = sprite(from: charactersAtlas, frameName: "characters/arab.png", fallbackSize: CGSize(width: 100, height: 150))
@@ -814,87 +880,98 @@ final class DesertTycoonScene: SKScene {
         closeOverlay()
         addDimOverlay(name: "dialog:close")
 
-        let panelSize = CGSize(width: min(760, size.width - 58), height: min(430, size.height - 58))
+        let panelSize = CGSize(width: min(790, size.width - safeInsets.left - safeInsets.right - 24), height: min(420, size.height - safeInsets.top - safeInsets.bottom - 24))
         let panel = panelNode(size: panelSize, title: "السوق")
         overlayNode.addChild(panel)
 
-        addButton(text: "X", name: "dialog:close", position: CGPoint(x: panelSize.width / 2 - 36, y: panelSize.height / 2 - 36), to: panel, width: 42, height: 38, red: true)
+        addButton(text: "×", name: "dialog:close", position: CGPoint(x: panelSize.width / 2 - 30, y: panelSize.height / 2 - 36), to: panel, width: 36, height: 35, red: true)
 
-        let topY = panelSize.height / 2 - 52
-        resourceHeader(text: "\(state.coins)", icon: "main_screen_ui/bottom_bar/coins_symbol.png", x: -90, y: topY, to: panel)
-        resourceHeader(text: "\(state.cash)", icon: "main_screen_ui/bottom_bar/dinars_symbol.png", x: 90, y: topY, to: panel)
-        resourceHeader(text: "\(max(0, state.availableWorkers - state.assignedWorkers))", icon: "souk_screen/icon_population.png", x: 255, y: topY, to: panel, atlas: soukAtlas)
+        let contentWidth = panelSize.width - 214
+        let contentCenterX = -panelSize.width / 2 + 198 + contentWidth / 2
+        let topY = panelSize.height / 2
+        let headerY = topY - 85
+        let headerSpacing = min(136, (contentWidth - 122) / 2)
+        resourceHeader(text: "\(state.coins)", icon: "main_screen_ui/bottom_bar/coins_symbol.png", x: contentCenterX - headerSpacing, y: headerY, to: panel)
+        resourceHeader(text: "\(state.cash)", icon: "main_screen_ui/bottom_bar/dinars_symbol.png", x: contentCenterX, y: headerY, to: panel)
+        resourceHeader(text: "\(max(0, state.availableWorkers - state.assignedWorkers))", icon: "souk_screen/icon_population.png", x: contentCenterX + headerSpacing, y: headerY, to: panel, atlas: soukAtlas)
 
-        let leftX = -panelSize.width / 2 + 112
-        let startY = panelSize.height / 2 - 105
+        let section = label("التصنيفات", size: 12, color: DTStyle.lightGold, alignment: .center)
+        section.position = CGPoint(x: -panelSize.width / 2 + 104, y: topY - 79)
+        panel.addChild(section)
         let categories = data.spec.storeCategories
         for (index, categoryName) in categories.enumerated() {
-            let rowY = startY - CGFloat(index) * 40
+            let column = index % 2
+            let row = index / 2
+            let tabX = -panelSize.width / 2 + 59 + CGFloat(column) * 90
+            let rowY = topY - 108 - CGFloat(row) * 45
             let selected = categoryName == selectedSoukCategory
-            let tab = SKShapeNode(rectOf: CGSize(width: 176, height: 36), cornerRadius: 6)
-            tab.fillColor = selected ? UIColor(red: 0.10, green: 0.47, blue: 0.57, alpha: 1) : UIColor(red: 0.79, green: 0.66, blue: 0.44, alpha: 1)
-            tab.strokeColor = UIColor(red: 0.42, green: 0.22, blue: 0.12, alpha: 1)
-            tab.lineWidth = 2
-            tab.position = CGPoint(x: leftX, y: rowY)
+            let tab = SKShapeNode(rectOf: CGSize(width: 84, height: 39), cornerRadius: 9)
+            tab.fillColor = selected ? DTStyle.gold : DTStyle.green.withAlphaComponent(0.85)
+            tab.strokeColor = selected ? DTStyle.lightGold : DTStyle.gold.withAlphaComponent(0.48)
+            tab.lineWidth = selected ? 2 : 1
+            tab.position = CGPoint(x: tabX, y: rowY)
             tab.name = "souk:category:\(categoryName)"
             panel.addChild(tab)
 
-            let categoryLabel = label(arabicCategoryName(categoryName), size: 17, color: selected ? .white : UIColor(red: 0.23, green: 0.12, blue: 0.07, alpha: 1), alignment: .center)
-            categoryLabel.position = CGPoint(x: leftX + 18, y: rowY - 7)
+            let categoryLabel = label(arabicCategoryName(categoryName), size: 12, color: selected ? DTStyle.ink : DTStyle.white, alignment: .center)
+            categoryLabel.position = CGPoint(x: tabX + 10, y: rowY)
             categoryLabel.name = tab.name
             panel.addChild(categoryLabel)
-            let icon = iconSprite(for: categoryName, fallbackSize: CGSize(width: 26, height: 26))
-            icon.position = CGPoint(x: leftX - 62, y: rowY)
-            icon.size = CGSize(width: 26, height: 26)
+            let icon = iconSprite(for: categoryName, fallbackSize: CGSize(width: 23, height: 23))
+            icon.position = CGPoint(x: tabX - 26, y: rowY)
+            icon.size = CGSize(width: 23, height: 23)
             icon.name = tab.name
             panel.addChild(icon)
         }
 
-        let content = SKShapeNode(rectOf: CGSize(width: panelSize.width - 250, height: panelSize.height - 140), cornerRadius: 8)
-        content.fillColor = UIColor(red: 0.42, green: 0.18, blue: 0.50, alpha: 1)
-        content.strokeColor = UIColor(red: 0.95, green: 0.79, blue: 0.45, alpha: 1)
-        content.lineWidth = 3
-        content.position = CGPoint(x: 104, y: -26)
+        let cardHeight = min(122, (panelSize.height - 146) / 2)
+        let content = SKShapeNode(rectOf: CGSize(width: contentWidth + 10, height: cardHeight * 2 + 22), cornerRadius: 13)
+        content.fillColor = DTStyle.ink.withAlphaComponent(0.34)
+        content.strokeColor = DTStyle.gold.withAlphaComponent(0.48)
+        content.lineWidth = 1
+        content.position = CGPoint(x: contentCenterX, y: -38)
         panel.addChild(content)
-
-        let title = label(arabicCategoryName(selectedSoukCategory), size: 27, color: .white, alignment: .center)
-        title.position = CGPoint(x: 104, y: panelSize.height / 2 - 126)
-        panel.addChild(title)
 
         let availableWorkers = max(0, state.availableWorkers - state.assignedWorkers)
         if selectedSoukCategory == "Business" && availableWorkers == 0 {
-            let guide = sprite(from: characters2Atlas, frameName: "characters/camel_falcon.png", fallbackSize: CGSize(width: 132, height: 132))
-            guide.position = CGPoint(x: 16, y: -26)
-            guide.size = CGSize(width: 132, height: 132)
-            panel.addChild(guide)
+            let compact = contentWidth < 410
+            if !compact {
+                let guide = sprite(from: characters2Atlas, frameName: "characters/camel_falcon.png", fallbackSize: CGSize(width: 132, height: 132))
+                guide.position = CGPoint(x: contentCenterX - 100, y: -38)
+                guide.size = CGSize(width: 100, height: 100)
+                panel.addChild(guide)
+            }
 
-            let bubble = SKShapeNode(rectOf: CGSize(width: 286, height: 152), cornerRadius: 14)
-            bubble.fillColor = UIColor(red: 0.94, green: 0.84, blue: 0.58, alpha: 1)
-            bubble.strokeColor = UIColor(red: 0.62, green: 0.38, blue: 0.19, alpha: 1)
+            let bubbleX = contentCenterX + (compact ? 0 : 70)
+            let bubbleWidth = contentWidth - (compact ? 24 : 180)
+            let bubble = SKShapeNode(rectOf: CGSize(width: bubbleWidth, height: 120), cornerRadius: 12)
+            bubble.fillColor = DTStyle.parchment
+            bubble.strokeColor = DTStyle.gold
             bubble.lineWidth = 2
-            bubble.position = CGPoint(x: 188, y: -24)
+            bubble.position = CGPoint(x: bubbleX, y: -38)
             panel.addChild(bubble)
 
-            let hint = label("المحال تحتاج إلى عمال.\nزد عدد السكان ببناء المساكن.", size: 19, color: UIColor(red: 0.28, green: 0.15, blue: 0.08, alpha: 1), alignment: .center)
-            hint.position = CGPoint(x: 188, y: -32)
-            hint.preferredMaxLayoutWidth = 240
+            let hint = label("المحال تحتاج إلى عمال.\nزد عدد السكان ببناء المساكن.", size: compact ? 14 : 16, color: DTStyle.brown, alignment: .center)
+            hint.position = bubble.position
+            hint.preferredMaxLayoutWidth = bubbleWidth - 20
             hint.numberOfLines = 3
             panel.addChild(hint)
             return
         }
 
         let items = data.items(in: selectedSoukCategory, level: state.level)
-        let cardWidth: CGFloat = 132
-        let cardHeight: CGFloat = 132
-        let columns = 3
-        let startX = content.position.x - 150
-        let startCardY = content.position.y + 62
-
         for (index, item) in items.prefix(6).enumerated() {
-            let column = index % columns
-            let row = index / columns
-            let cardPosition = CGPoint(x: startX + CGFloat(column) * 150, y: startCardY - CGFloat(row) * 150)
-            addStoreCard(item: item, position: cardPosition, size: CGSize(width: cardWidth, height: cardHeight), to: panel)
+            let column = index % 3
+            let row = index / 3
+            let stride = (contentWidth - 16) / 3
+            let cardPosition = CGPoint(x: contentCenterX + CGFloat(column - 1) * stride, y: topY - 146 - CGFloat(row) * (cardHeight + 9))
+            addStoreCard(item: item, position: cardPosition, size: CGSize(width: stride - 9, height: cardHeight), to: panel)
+        }
+
+        if items.isEmpty {
+            let empty = label("لا توجد عناصر في هذا القسم", size: 19, color: DTStyle.white, alignment: .center)
+            empty.position = CGPoint(x: contentCenterX, y: -38)
+            panel.addChild(empty)
         }
     }
 
@@ -909,53 +986,54 @@ final class DesertTycoonScene: SKScene {
     }
 
     private func resourceHeader(text: String, icon: String, x: CGFloat, y: CGFloat, to panel: SKNode, atlas: CocosTextureAtlas? = nil) {
-        let box = SKShapeNode(rectOf: CGSize(width: 124, height: 36), cornerRadius: 5)
-        box.fillColor = UIColor(red: 0.18, green: 0.10, blue: 0.07, alpha: 0.78)
-        box.strokeColor = UIColor(red: 0.76, green: 0.57, blue: 0.31, alpha: 1)
+        let box = SKShapeNode(rectOf: CGSize(width: 122, height: 32), cornerRadius: 9)
+        box.fillColor = DTStyle.ink.withAlphaComponent(0.76)
+        box.strokeColor = DTStyle.gold.withAlphaComponent(0.7)
         box.position = CGPoint(x: x, y: y)
         panel.addChild(box)
         let iconNode = sprite(from: atlas ?? gameAtlas, frameName: icon, fallbackSize: CGSize(width: 28, height: 28))
-        iconNode.position = CGPoint(x: x - 42, y: y)
-        iconNode.size = CGSize(width: 28, height: 28)
+        iconNode.position = CGPoint(x: x - 41, y: y)
+        iconNode.size = CGSize(width: 24, height: 24)
         panel.addChild(iconNode)
-        let value = label(text, size: 17, color: .white, alignment: .right)
-        value.position = CGPoint(x: x + 48, y: y - 7)
+        let value = label(text, size: 16, color: DTStyle.white, alignment: .center)
+        value.position = CGPoint(x: x + 13, y: y)
         panel.addChild(value)
     }
 
     private func addStoreCard(item: DTStoreItem, position: CGPoint, size: CGSize, to panel: SKNode) {
         let locked = item.isLocked(at: state.level)
         let actionName = "souk:buy:\(item.id)"
-        let card = sprite(from: soukAtlas, frameName: "souk_screen/souk_item_frame.png", fallbackSize: size)
-        card.size = size
+        let card = SKShapeNode(rectOf: size, cornerRadius: 10)
+        card.fillColor = locked ? DTStyle.sand : DTStyle.parchment
+        card.strokeColor = locked ? DTStyle.brown.withAlphaComponent(0.7) : DTStyle.gold
+        card.lineWidth = 2
         card.position = position
-        card.alpha = locked ? 0.58 : 1
         card.name = actionName
         panel.addChild(card)
 
-        let itemName = label(item.name, size: 13, color: UIColor(red: 0.23, green: 0.12, blue: 0.07, alpha: 1), alignment: .center)
-        itemName.position = CGPoint(x: position.x, y: position.y + size.height / 2 - 24)
+        let itemName = label(item.name, size: 13, color: DTStyle.brown, alignment: .center)
+        itemName.position = CGPoint(x: position.x, y: position.y + size.height / 2 - 17)
         itemName.preferredMaxLayoutWidth = size.width - 12
         itemName.numberOfLines = 2
         itemName.name = actionName
         panel.addChild(itemName)
 
-        let icon = storeIconSprite(for: item, fallbackSize: CGSize(width: 54, height: 54))
-        icon.position = CGPoint(x: position.x, y: position.y + 20)
-        icon.size = CGSize(width: 54, height: 54)
+        let icon = storeIconSprite(for: item, fallbackSize: CGSize(width: 38, height: 38))
+        icon.position = CGPoint(x: position.x, y: position.y + 9)
+        icon.size = CGSize(width: 38, height: 38)
+        icon.alpha = locked ? 0.48 : 1
         icon.name = actionName
         panel.addChild(icon)
 
         if locked {
-            let lock = label("يتطلب\nالمستوى \(item.unlockLevel)", size: 16, color: .yellow, alignment: .center)
-            lock.position = CGPoint(x: position.x, y: position.y - 6)
-            lock.numberOfLines = 2
+            let lock = label("يفتح بالمستوى \(item.unlockLevel)", size: 12, color: DTStyle.brown, alignment: .center)
+            lock.position = CGPoint(x: position.x, y: position.y - size.height / 2 + 18)
             lock.name = actionName
             panel.addChild(lock)
         } else {
             if let detail = storeDetailText(for: item) {
-                let detailLabel = label(detail, size: 10, color: UIColor(red: 0.28, green: 0.15, blue: 0.08, alpha: 1), alignment: .center)
-                detailLabel.position = CGPoint(x: position.x, y: position.y - 26)
+                let detailLabel = label(detail, size: 10, color: DTStyle.brown, alignment: .center)
+                detailLabel.position = CGPoint(x: position.x, y: position.y - 16)
                 detailLabel.preferredMaxLayoutWidth = size.width - 14
                 detailLabel.numberOfLines = 2
                 detailLabel.name = actionName
@@ -963,27 +1041,29 @@ final class DesertTycoonScene: SKScene {
             }
 
             let costText = item.cashCost > 0 ? "\(item.cashCost)" : "\(item.coinCost)"
-            let buy = sprite(from: soukAtlas, frameName: "souk_screen/souk_item_button.png", fallbackSize: CGSize(width: 96, height: 30))
-            buy.size = CGSize(width: 96, height: 30)
-            buy.position = CGPoint(x: position.x, y: position.y - size.height / 2 + 22)
+            let buy = SKShapeNode(rectOf: CGSize(width: min(105, size.width - 18), height: 25), cornerRadius: 7)
+            buy.fillColor = DTStyle.green
+            buy.strokeColor = DTStyle.gold
+            buy.lineWidth = 1
+            buy.position = CGPoint(x: position.x, y: position.y - size.height / 2 + 14)
             buy.name = actionName
             panel.addChild(buy)
 
-            let cost = label(costText, size: 17, color: .white, alignment: .center)
-            cost.position = CGPoint(x: position.x + 10, y: buy.position.y - 7)
+            let cost = label(costText, size: 14, color: DTStyle.white, alignment: .center)
+            cost.position = CGPoint(x: position.x + 10, y: buy.position.y)
             cost.name = actionName
             panel.addChild(cost)
 
             let iconFrame = item.cashCost > 0 ? "main_screen_ui/bottom_bar/dinars_symbol.png" : "main_screen_ui/bottom_bar/coins_symbol.png"
             let coin = sprite(from: gameAtlas, frameName: iconFrame, fallbackSize: CGSize(width: 18, height: 18))
-            coin.position = CGPoint(x: position.x - 30, y: buy.position.y)
-            coin.size = CGSize(width: 20, height: 20)
+            coin.position = CGPoint(x: position.x - 28, y: buy.position.y)
+            coin.size = CGSize(width: 18, height: 18)
             coin.name = actionName
             panel.addChild(coin)
         }
 
         if shouldPointAtStoreItem(item) {
-            addTutorialArrow(to: panel, at: CGPoint(x: position.x - 82, y: position.y + 12), rotation: 0, size: CGSize(width: 54, height: 40))
+            addTutorialArrow(to: panel, at: CGPoint(x: position.x - size.width / 2 - 20, y: position.y), rotation: 0, size: CGSize(width: 36, height: 27))
         }
     }
 
@@ -1199,6 +1279,9 @@ final class DesertTycoonScene: SKScene {
 
         let root = SKNode()
         root.zPosition = 3000
+        root.position = CGPoint(x: (safeInsets.left - safeInsets.right) / 2, y: (safeInsets.bottom - safeInsets.top) / 2)
+        let fit = min(1, (size.width - safeInsets.left - safeInsets.right - 20) / 590, (size.height - safeInsets.top - safeInsets.bottom - 20) / 240)
+        root.setScale(fit)
         overlayNode.addChild(root)
 
         let guide = sprite(from: characters2Atlas, frameName: "characters/camel_falcon.png", fallbackSize: CGSize(width: 150, height: 150))
@@ -1291,45 +1374,57 @@ final class DesertTycoonScene: SKScene {
 
     private func panelNode(size: CGSize, title: String) -> SKNode {
         let root = SKNode()
+        root.name = "dialog:surface"
         root.zPosition = 3000
+        root.position = CGPoint(x: (safeInsets.left - safeInsets.right) / 2, y: (safeInsets.bottom - safeInsets.top) / 2)
+        let fit = min(1, (self.size.width - safeInsets.left - safeInsets.right - 24) / size.width, (self.size.height - safeInsets.top - safeInsets.bottom - 20) / size.height)
+        root.setScale(fit)
 
-        if let texture = backgroundAtlas?.texture(named: "dialogues_ui/friend_purchase_bg.png") {
-            let frame = SKSpriteNode(texture: texture)
-            frame.size = size
-            frame.zPosition = -1
-            root.addChild(frame)
-        } else {
-            let frame = SKShapeNode(rectOf: size, cornerRadius: 10)
-            frame.fillColor = UIColor(red: 0.52, green: 0.24, blue: 0.10, alpha: 0.98)
-            frame.strokeColor = UIColor(red: 0.95, green: 0.82, blue: 0.52, alpha: 1)
-            frame.lineWidth = 5
-            root.addChild(frame)
+        let shadow = SKShapeNode(rectOf: size, cornerRadius: 22)
+        shadow.fillColor = DTStyle.ink.withAlphaComponent(0.55)
+        shadow.strokeColor = .clear
+        shadow.position = CGPoint(x: 0, y: -8)
+        shadow.zPosition = -3
+        root.addChild(shadow)
 
-            let inner = SKShapeNode(rectOf: CGSize(width: size.width - 28, height: size.height - 28), cornerRadius: 8)
-            inner.fillColor = UIColor(red: 0.45, green: 0.20, blue: 0.09, alpha: 0.78)
-            inner.strokeColor = UIColor(red: 0.86, green: 0.68, blue: 0.38, alpha: 1)
-            inner.lineWidth = 2
-            root.addChild(inner)
-        }
+        let frame = SKShapeNode(rectOf: size, cornerRadius: 22)
+        frame.fillColor = DTStyle.parchment
+        frame.strokeColor = DTStyle.brown
+        frame.lineWidth = 3
+        frame.zPosition = -2
+        root.addChild(frame)
 
-        let titleNode = label(title, size: 30, color: .white, alignment: .center)
-        titleNode.position = CGPoint(x: 0, y: size.height / 2 - 48)
+        let inner = SKShapeNode(rectOf: CGSize(width: size.width - 12, height: size.height - 12), cornerRadius: 18)
+        inner.fillColor = DTStyle.deepGreen
+        inner.strokeColor = DTStyle.gold
+        inner.lineWidth = 1.5
+        inner.zPosition = -1
+        root.addChild(inner)
+
+        let rule = SKShapeNode(rectOf: CGSize(width: size.width - 48, height: 1), cornerRadius: 0.5)
+        rule.fillColor = DTStyle.gold.withAlphaComponent(0.7)
+        rule.strokeColor = .clear
+        rule.position = CGPoint(x: 0, y: size.height / 2 - 76)
+        root.addChild(rule)
+
+        let titleNode = label(title, size: 26, color: DTStyle.white, alignment: .center)
+        titleNode.position = CGPoint(x: 0, y: size.height / 2 - 40)
         root.addChild(titleNode)
         return root
     }
 
     private func addButton(text: String, name: String, position: CGPoint, to parent: SKNode, width: CGFloat, height: CGFloat = 48, red: Bool = false) {
-        let button = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 7)
-        button.fillColor = red ? UIColor(red: 0.75, green: 0.08, blue: 0.06, alpha: 1) : UIColor(red: 0.18, green: 0.56, blue: 0.18, alpha: 1)
-        button.strokeColor = UIColor(red: 0.94, green: 0.78, blue: 0.42, alpha: 1)
-        button.lineWidth = 3
+        let button = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 12)
+        button.fillColor = red ? UIColor(red: 0.53, green: 0.19, blue: 0.14, alpha: 1) : DTStyle.green
+        button.strokeColor = DTStyle.lightGold
+        button.lineWidth = 2
         button.position = position
         button.name = name
         button.zPosition = 20
         parent.addChild(button)
 
-        let textNode = label(text, size: red ? 22 : 24, color: .white, alignment: .center)
-        textNode.position = CGPoint(x: position.x, y: position.y - 9)
+        let textNode = label(text, size: min(height * 0.44, 20), color: DTStyle.white, alignment: .center)
+        textNode.position = position
         textNode.name = name
         textNode.zPosition = 21
         parent.addChild(textNode)
@@ -1337,7 +1432,7 @@ final class DesertTycoonScene: SKScene {
 
     private func addDimOverlay(name: String) {
         let blocker = SKShapeNode(rect: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
-        blocker.fillColor = UIColor(white: 0, alpha: 0.58)
+        blocker.fillColor = DTStyle.ink.withAlphaComponent(0.72)
         blocker.strokeColor = .clear
         blocker.name = name
         blocker.zPosition = 2500
@@ -1352,19 +1447,19 @@ final class DesertTycoonScene: SKScene {
         placementNode.removeAllChildren()
         guard let placement = activePlacement else { return }
 
-        let message = SKShapeNode(rectOf: CGSize(width: 330, height: 48), cornerRadius: 8)
-        message.fillColor = UIColor(red: 0.15, green: 0.09, blue: 0.06, alpha: 0.86)
-        message.strokeColor = UIColor(red: 0.88, green: 0.72, blue: 0.42, alpha: 1)
-        message.position = CGPoint(x: 0, y: size.height / 2 - 44)
+        let message = SKShapeNode(rectOf: CGSize(width: 320, height: 49), cornerRadius: 12)
+        message.fillColor = DTStyle.deepGreen
+        message.strokeColor = DTStyle.gold
+        message.position = CGPoint(x: 0, y: size.height / 2 - safeInsets.top - 113)
         message.zPosition = 2200
         placementNode.addChild(message)
-        let text = label("ضع \(placement.item.name)", size: 17, color: .white, alignment: .center)
-        text.position = CGPoint(x: 0, y: size.height / 2 - 51)
+        let text = label("اختر موقع \(placement.item.name)", size: 17, color: DTStyle.white, alignment: .center)
+        text.position = message.position
         text.zPosition = 2201
         placementNode.addChild(text)
 
-        addButton(text: "حسنًا", name: "placement:confirm", position: CGPoint(x: size.width / 2 - 84, y: size.height / 2 - 46), to: placementNode, width: 86, height: 42)
-        addButton(text: "X", name: "placement:cancel", position: CGPoint(x: size.width / 2 - 174, y: size.height / 2 - 46), to: placementNode, width: 54, height: 42, red: true)
+        addButton(text: "تأكيد", name: "placement:confirm", position: CGPoint(x: size.width / 2 - safeInsets.right - 55, y: -size.height / 2 + safeInsets.bottom + 133), to: placementNode, width: 96, height: 43)
+        addButton(text: "إلغاء", name: "placement:cancel", position: CGPoint(x: size.width / 2 - safeInsets.right - 55, y: -size.height / 2 + safeInsets.bottom + 186), to: placementNode, width: 96, height: 43, red: true)
         renderPlacementGhost()
     }
 
@@ -1469,6 +1564,7 @@ final class DesertTycoonScene: SKScene {
             activePlacement = nil
             effectLayer.childNode(withName: "placement-ghost")?.removeFromParent()
             layoutPlacementControls()
+            layoutHUD()
         } else if action == "mock:videoReward" {
             state.cash += 1
             closeOverlay()
@@ -2028,6 +2124,7 @@ final class DesertTycoonScene: SKScene {
         let nextScale = cameraNode.xScale * previousDistance / currentDistance
         cameraNode.setScale(min(max(nextScale, 0.62), 2.1))
         clampCamera()
+        alignScreenLayers()
     }
 
     private func iconSprite(for category: String, fallbackSize: CGSize) -> SKSpriteNode {
