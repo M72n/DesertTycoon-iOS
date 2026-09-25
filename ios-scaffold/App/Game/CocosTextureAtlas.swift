@@ -34,9 +34,16 @@ final class CocosTextureAtlas {
             let plistDirectory = (plistCandidate as NSString).deletingLastPathComponent
             let texturePath = plistDirectory.isEmpty ? textureFileName : "\(plistDirectory)/\(textureFileName)"
 
-            guard let baseTexture = BundleAssetResolver.texture(candidates: [texturePath]) else {
+            // Some legacy "upscaled" sheets were exported as opaque RGB with a white
+            // background. SpriteKit would draw a white rectangle around every icon.
+            // Keep the higher-resolution sheet only if it retains real transparency.
+            guard let image = BundleAssetResolver.image(candidates: [texturePath]),
+                  let cgImage = image.cgImage,
+                  Self.hasAlpha(cgImage) else {
                 continue
             }
+            let baseTexture = SKTexture(image: image)
+            baseTexture.filteringMode = .linear
 
             var parsedFrames: [String: Frame] = [:]
             for (name, value) in frameDictionary {
@@ -53,6 +60,15 @@ final class CocosTextureAtlas {
         }
 
         return nil
+    }
+
+    private static func hasAlpha(_ image: CGImage) -> Bool {
+        switch image.alphaInfo {
+        case .first, .last, .premultipliedFirst, .premultipliedLast:
+            return true
+        default:
+            return false
+        }
     }
 
     func texture(named frameName: String) -> SKTexture? {
